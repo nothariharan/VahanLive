@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { FaRoute } from 'react-icons/fa';
+import { MdFindReplace } from 'react-icons/md';
 
 const RouteOptimizer = () => {
   const [stops, setStops] = useState([]);
@@ -92,7 +94,7 @@ const RouteOptimizer = () => {
       className="bg-white rounded-lg shadow-lg p-4"
     >
       <h2 className="text-xl font-bold mb-3 text-gray-800 flex items-center gap-2">
-        <span className="text-2xl">🎯</span> Route Optimizer
+        <span className="text-2xl"><FaRoute/></span> Route Optimizer
       </h2>
       
       <div className="space-y-3">
@@ -175,28 +177,31 @@ const RouteOptimizer = () => {
           className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-3 px-4 rounded-md transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  fill="none"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Finding Routes...
-            </span>
-          ) : (
-            '🚀 Find Best Route'
-          )}
+  <span className="flex items-center justify-center gap-2">
+    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+        fill="none"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+        </svg>
+          Finding Routes...
+          </span>
+        ) : (
+          <span className="flex items-center justify-center gap-2">
+            <MdFindReplace className="text-2xl" /> {/* Added class for size */}
+            Find Best Route
+          </span>
+        )}
         </motion.button>
 
         {/* Results */}

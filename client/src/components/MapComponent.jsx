@@ -87,7 +87,7 @@ const MapComponent = ({ selectedRoute, buses, seatsMap = {}, routeSeatsMap = {} 
                   <h3 className="font-bold">{stop.name}</h3>
                   <p className="text-sm text-gray-600">Bus Stop</p>
 
-                  {/* show a simple seat summary for the route when hovering stops */}
+                  {/* TODO :  show a simple seat summary for the route when hovering stops */}
                   {selectedRoute && routeSeatsMap && routeSeatsMap[selectedRoute.id] && (
                     <p className="text-sm text-gray-700 mt-2">Seats: {routeSeatsMap[selectedRoute.id].available}/{routeSeatsMap[selectedRoute.id].capacity}</p>
                   )}

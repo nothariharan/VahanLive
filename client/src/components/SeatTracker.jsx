@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
+import { FaMagnifyingGlass } from 'react-icons/fa6';
 
 const API_URL = 'http://localhost:5000';
 const SOCKET_URL = 'http://localhost:5000';
@@ -45,7 +46,7 @@ const SeatTracker = ({ watchedRoutes = [], onRemoveWatch }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-3 mt-4">
-      <h3 className="font-bold mb-2">Seat Tracker 🔍</h3>
+      <span className='flex items-center jusify-center'><h2 className="font-bold mb-2">Seat Tracker</h2> <FaMagnifyingGlass className='ml-2 mb-2'/></span>
       {watchedRoutes.length === 0 && (
         <p className="text-sm text-gray-600">No routes watched. Click "Watch" on a route to monitor seats live.</p>
       )}
