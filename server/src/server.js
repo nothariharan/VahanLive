@@ -42,6 +42,10 @@ io.on('connection', (socket) => {
   });
 });
 
+// Initialize seat manager (imports placed here to avoid circulars)
+import { initSeatManager } from './seatManager.js';
+initSeatManager(io);
+
 // export the io for simulation (check for error at end)
 export { io };
 

@@ -1,7 +1,7 @@
 // client/src/components/RouteSelector.jsx
 import { motion } from 'framer-motion';
 
-const RouteSelector = ({ routes, selectedRoute, onRouteSelect }) => {
+const RouteSelector = ({ routes, selectedRoute, onRouteSelect, watchedRoutes = [], toggleWatch, routeSeatsMap = {} }) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -44,12 +44,29 @@ const RouteSelector = ({ routes, selectedRoute, onRouteSelect }) => {
               </motion.div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold truncate">{route.name}</div>
+
+                {/* seat summary: compute simple totals from routeSeatsMap if available */}
                 <div className={`text-xs ${
                   selectedRoute?.id === route.id ? 'opacity-90' : 'opacity-75'
                 }`}>
                   {route.type === 'airway' ? '✈️ Flight' : `🛑 ${route.stops.length} stops`} • {route.schedule.frequency}
+                  {routeSeatsMap && routeSeatsMap[route.id] && (
+                    <span className="ml-2 text-gray-600">• Seats: {routeSeatsMap[route.id].available}/{routeSeatsMap[route.id].capacity}</span>
+                  )}
                 </div>
               </div>
+            </div>
+
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); onRouteSelect(route); }}
+                className="text-sm px-3 py-1 rounded bg-white/20 border"
+              >View</button>
+
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleWatch(route); }}
+                className={`text-sm px-3 py-1 rounded ${watchedRoutes.some(r=> r.id === route.id) ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
+              >{watchedRoutes.some(r=> r.id === route.id) ? 'Unwatch' : 'Watch'}</button>
             </div>
           </motion.button>
         ))}

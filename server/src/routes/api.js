@@ -60,6 +60,48 @@ router.get('/stops', (req, res) => {
   }
 });
 
+// --- Seat availability endpoints (simple in-memory for demo)
+import { getAllSeats, getSeatsForRoute, getSeatsForBus, bookSeat } from '../seatManager.js';
+
+// Get all seats
+router.get('/seats', (req, res) => {
+  try {
+    const seats = getAllSeats();
+    res.json({ success: true, data: seats });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching seats', error: error.message });
+  }
+});
+
+// Get seats by route id
+router.get('/seats/:routeId', (req, res) => {
+  try {
+    const seats = getSeatsForRoute(req.params.routeId);
+    res.json({ success: true, data: seats });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching seats by route', error: error.message });
+  }
+});
+
+// Book a seat (POST) - body: { busId, class } (class optional for flights)
+router.post('/seats/book', (req, res) => {
+  try {
+    const { busId, class: cls } = req.body || {};
+    if (!busId) {
+      return res.status(400).json({ success: false, message: 'busId is required to book a seat' });
+    }
+
+    const updated = bookSeat(busId, { class: cls });
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Bus/Flight not found' });
+    }
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error booking seat', error: error.message });
+  }
+});
+
 // Optimize route between two stops (with multi-route support)
 router.post('/optimize-route', (req, res) => {
   try {

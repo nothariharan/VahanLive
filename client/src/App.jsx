@@ -6,6 +6,7 @@ import axios from 'axios';
 import MapComponent from './components/MapComponent';
 import RouteSelector from './components/RouteSelector';
 import RouteOptimizer from './components/RouteOptimizer';
+import SeatTracker from './components/SeatTracker';
 
 const SOCKET_URL = 'http://localhost:5001';
 const API_URL = 'http://localhost:5000';
@@ -15,8 +16,11 @@ function App() {
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [buses, setBuses] = useState([]);
   const [socket, setSocket] = useState(null);
+  const [bankSocket, setBankSocket] = useState(null); // seat socket
+  const [seatsMap, setSeatsMap] = useState({}); // keyed by busId
   const [connectionStatus, setConnectionStatus] = useState('Disconnected');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [watchedRoutes, setWatchedRoutes] = useState([]);
 
   // Fetch routes from API
   useEffect(() => {
@@ -35,7 +39,7 @@ function App() {
     fetchRoutes();
   }, []);
 
-  // Setup Socket.io connection
+  // Setup Socket.io connection (simulator)
   useEffect(() => {
     const newSocket = io(SOCKET_URL, {
       transports: ['websocket'],
@@ -74,7 +78,36 @@ function App() {
     };
   }, []);
 
-  // Subscribe to route updates
+  // Setup seat updates socket (server)
+  useEffect(() => {
+    const seatSocket = io('http://localhost:5000', { transports: ['websocket'] });
+    setBankSocket(seatSocket);
+
+    seatSocket.on('connect', () => console.log('[Seats] connected'));
+    seatSocket.on('disconnect', () => console.log('[Seats] disconnected'));
+
+    seatSocket.on('seat_update', (payload) => {
+      setSeatsMap((prev) => ({ ...prev, [payload.busId]: payload }));
+    });
+
+    // initial fetch
+    (async () => {
+      try {
+        const res = await (await fetch(`${API_URL}/api/seats`)).json();
+        if (res && res.data) {
+          const map = {};
+          res.data.forEach((s) => (map[s.busId] = s));
+          setSeatsMap(map);
+        }
+      } catch (err) {
+        console.error('Error fetching initial seats', err);
+      }
+    })();
+
+    return () => seatSocket.close();
+  }, []);
+
+  // Subscribe to route updates (simulator + seat updates)
   useEffect(() => {
     if (socket && selectedRoute) {
       routes.forEach(route => {
@@ -87,11 +120,39 @@ function App() {
         prevBuses.filter(bus => bus.routeId === selectedRoute.id)
       );
     }
-  }, [socket, selectedRoute, routes]);
+
+    // subscribe seats socket
+    if (bankSocket && selectedRoute) {
+      routes.forEach(route => bankSocket.emit('unsubscribe_route', route.id));
+      bankSocket.emit('subscribe_route', selectedRoute.id);
+    }
+  }, [socket, selectedRoute, routes, bankSocket]);
 
   const activeBusesOnRoute = buses.filter(
     bus => bus.routeId === selectedRoute?.id
   );
+
+  // helper: toggle watch on a route
+  function toggleWatch(route) {
+    setWatchedRoutes((prev) => {
+      if (prev.some(r => r.id === route.id)) return prev.filter(r => r.id !== route.id);
+      return [...prev, route];
+    });
+  }
+
+  // build a simple routeSeatsMap used for display in selectors and popups
+  const routeSeatsMap = {};
+  Object.values(seatsMap).forEach((s) => {
+    if (!routeSeatsMap[s.routeId]) routeSeatsMap[s.routeId] = { available: 0, capacity: 0 };
+
+    if (s.type === 'bus') {
+      routeSeatsMap[s.routeId].available += s.seats.available;
+      routeSeatsMap[s.routeId].capacity += s.seats.capacity;
+    } else {
+      routeSeatsMap[s.routeId].available += s.seats.economy.available + s.seats.business.available;
+      routeSeatsMap[s.routeId].capacity += s.seats.economy.capacity + s.seats.business.capacity;
+    }
+  });
 
   const busCount = buses.filter(b => b.type === 'bus').length;
   const flightCount = buses.filter(b => b.type === 'airway').length;
@@ -100,29 +161,32 @@ function App() {
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 relative">
       {/* Toggle Button - Always visible */}
       <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="fixed top-4 z-[2000] bg-white rounded-full p-3 shadow-lg hover:shadow-xl transition-all"
-        animate={{ left: sidebarOpen ? '336px' : '16px' }}
-        transition={{ duration: 9, type: 'spring', damping: 100 }} //check for styling here
-      >
-        <motion.svg
-          animate={{ rotate: sidebarOpen ? 0 : 180 }}
-          transition={{ duration: 0.3 }}
-          className="w-6 h-6 text-gray-700"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-          />
-        </motion.svg>
-      </motion.button>
+  whileHover={{ scale: 1.1, backgroundColor: "#eff6ff" }} 
+  whileTap={{ scale: 0.9 }}
+  onClick={() => setSidebarOpen(!sidebarOpen)}
+  className="fixed top-4 z-[2000] p-3 rounded-full shadow-xl 
+             bg-white/90 backdrop-blur-md border border-gray-200 
+             text-gray-700 hover:text-blue-600 hover:shadow-2xl hover:border-blue-200"
+  animate={{ left: sidebarOpen ? '336px' : '16px' }}
+
+  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+>
+  <motion.svg
+    animate={{ rotate: sidebarOpen ? 0 : 180 }}
+    transition={{ duration: 0.4, ease: "backOut" }} 
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2.5}
+      d="M15 19l-7-7 7-7" 
+    />
+  </motion.svg>
+</motion.button>
 
       {/* Sidebar */}
       <AnimatePresence>
@@ -178,6 +242,9 @@ function App() {
                 routes={routes}
                 selectedRoute={selectedRoute}
                 onRouteSelect={setSelectedRoute}
+                watchedRoutes={watchedRoutes}
+                toggleWatch={toggleWatch}
+                routeSeatsMap={routeSeatsMap}
               />
 
               {/* Active Vehicles Count */}
@@ -242,6 +309,9 @@ function App() {
 
               {/* Route Optimizer */}
               <RouteOptimizer />
+
+              {/* Seat Tracker */}
+              <SeatTracker watchedRoutes={watchedRoutes} onRemoveWatch={(r)=> setWatchedRoutes((prev)=> prev.filter(x=> x.id !== r.id))} />
             </div>
           </motion.div>
         )}
@@ -252,6 +322,8 @@ function App() {
         <MapComponent
           selectedRoute={selectedRoute}
           buses={activeBusesOnRoute}
+          seatsMap={seatsMap}
+          routeSeatsMap={routeSeatsMap}
         />
         
         {/* Floating Stats */}

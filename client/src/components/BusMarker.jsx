@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { interpolatePosition, easeInOutCubic } from '../utils/interpolation';
-const BusMarker = ({ bus, routeColor }) => {
+const BusMarker = ({ bus, routeColor, seatInfo, routeStops = [] }) => {
   const [currentPosition, setCurrentPosition] = useState(bus.position);
   const [isAnimating, setIsAnimating] = useState(false);
   const animationRef = useRef(null);
@@ -88,11 +88,29 @@ const BusMarker = ({ bus, routeColor }) => {
             <p><span className="font-semibold">Route:</span> {bus.routeId}</p>
             <p><span className="font-semibold">Speed:</span> {bus.speed} km/h</p>
             <p><span className="font-semibold">Passengers:</span> {bus.passengers}</p>
+
+            {/* seat info */}
+            {seatInfo && seatInfo.type === 'bus' && (
+              <p><span className="font-semibold">Seats:</span> {seatInfo.seats.available}/{seatInfo.seats.capacity} available</p>
+            )}
+
+            {seatInfo && seatInfo.type === 'airway' && (
+              <div>
+                <p><span className="font-semibold">Economy:</span> {seatInfo.seats.economy.available}/{seatInfo.seats.economy.capacity} available</p>
+                <p><span className="font-semibold">Business:</span> {seatInfo.seats.business.available}/{seatInfo.seats.business.capacity} available</p>
+              </div>
+            )}
+
             <p><span className="font-semibold">Status:</span> 
               <span className={`ml-1 ${isAnimating ? 'text-green-600' : 'text-gray-600'}`}>
                 {isAnimating ? 'Moving' : 'Stopped'}
               </span>
             </p>
+
+            {/* Next stop (approx) */}
+            {routeStops.length > 0 && (
+              <p className="text-sm text-gray-600 mt-1">Next stop: {getNearestStopName({lat: bus.position.lat, lng: bus.position.lng}, routeStops)}</p>
+            )}
           </div>
         </div>
       </Popup>
@@ -121,4 +139,17 @@ function haversineMeters(coords1, coords2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c;
+}
+
+function getNearestStopName(pos, stops) {
+  let nearest = null;
+  let minDist = Number.POSITIVE_INFINITY;
+  stops.forEach((s) => {
+    const d = haversineMeters(pos, { lat: s.lat, lng: s.lng });
+    if (d < minDist) {
+      minDist = d;
+      nearest = s.name;
+    }
+  });
+  return nearest || 'Unknown';
 }

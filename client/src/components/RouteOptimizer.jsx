@@ -8,6 +8,7 @@ const RouteOptimizer = () => {
   const [startStop, setStartStop] = useState('');
   const [endStop, setEndStop] = useState('');
   const [result, setResult] = useState(null);
+  const [seatSummaries, setSeatSummaries] = useState({});
   const [loading, setLoading] = useState(false);
 
   // Fetch all stops on component mount
@@ -40,7 +41,35 @@ const RouteOptimizer = () => {
         startStopId: startStop,
         endStopId: endStop
       });
-      setResult(response.data.data);
+      const data = response.data.data;
+      setResult(data);
+
+      // fetch seat summaries for suggested routes
+      if (data && data.suggestedRoutes) {
+        const summaries = {};
+        await Promise.all(data.suggestedRoutes.map(async (r) => {
+          try {
+            const res = await axios.get(`http://localhost:5000/api/seats/${r.routeId}`);
+            const routeSeats = res.data.data || [];
+            // aggregate
+            let available = 0;
+            let capacity = 0;
+            routeSeats.forEach((s) => {
+              if (s.type === 'bus') {
+                available += s.seats.available;
+                capacity += s.seats.capacity;
+              } else {
+                available += s.seats.economy.available + s.seats.business.available;
+                capacity += s.seats.economy.capacity + s.seats.business.capacity;
+              }
+            });
+            summaries[r.routeId] = { available, capacity };
+          } catch (e) {
+            console.error('error fetching seats for route', r.routeId, e);
+          }
+        }));
+        setSeatSummaries(summaries);
+      }
     } catch (error) {
       console.error('Optimization error:', error);
       alert('Failed to optimize route');
@@ -239,6 +268,9 @@ const RouteOptimizer = () => {
                           <div className="text-xs text-gray-600 space-y-1">
                             <div>📍 <strong>From:</strong> {route.startStop}</div>
                             <div>🏁 <strong>To:</strong> {route.endStop}</div>
+                            {seatSummaries[route.routeId] && (
+                              <div className="mt-1 text-sm text-gray-800">Seats: {seatSummaries[route.routeId].available}/{seatSummaries[route.routeId].capacity}</div>
+                            )}
                           </div>
                         </div>
                       )}
