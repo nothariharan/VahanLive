@@ -181,9 +181,9 @@ const RouteOptimizer = () => {
               className="overflow-hidden"
             >
               {result.suggestedRoutes && result.suggestedRoutes.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    ✅ {result.message}
+                    {result.hasDirectRoute ? '✅ Direct routes available' : '🔄 Transfer required'}
                   </div>
                   
                   {result.suggestedRoutes.map((route, idx) => (
@@ -192,68 +192,96 @@ const RouteOptimizer = () => {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.1 }}
-                      className={`p-3 rounded-lg border-2 ${
+                      className={`rounded-lg border-2 overflow-hidden ${
                         idx === 0
-                          ? 'bg-green-50 border-green-300'
-                          : 'bg-blue-50 border-blue-200'
+                          ? 'border-green-400 bg-green-50'
+                          : 'border-blue-200 bg-blue-50'
                       }`}
                     >
-                      {idx === 0 && (
-                        <div className="text-xs font-bold text-green-700 mb-1">
-                          ⭐ BEST OPTION
+                      {/* Header */}
+                      <div className="p-3 bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+                        {idx === 0 && (
+                          <div className="text-xs font-bold text-green-700 mb-1 flex items-center gap-1">
+                            ⭐ BEST OPTION
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{route.isDirect ? '🎯' : '🔄'}</span>
+                            <span className="text-xs font-semibold text-gray-600">
+                              {route.isDirect ? 'DIRECT' : 'VIA TRANSFER'}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-blue-600">
+                              ~{route.estimatedTime} min
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {route.stopsCount} stops
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Direct Route */}
+                      {route.isDirect && (
+                        <div className="p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xl">{route.routeType === 'airway' ? '✈️' : '🚍'}</span>
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: route.routeColor }}
+                            />
+                            <div className="font-semibold text-gray-800 text-sm">
+                              {route.routeName}
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-600 space-y-1">
+                            <div>📍 <strong>From:</strong> {route.startStop}</div>
+                            <div>🏁 <strong>To:</strong> {route.endStop}</div>
+                          </div>
                         </div>
                       )}
 
-                      <div className="flex items-center gap-2 mb-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: route.routeColor }}
-                        />
-                        <div className="font-semibold text-gray-800 text-sm">
-                          {route.routeName}
-                        </div>
-                      </div>
-
-                      <div className="text-xs text-gray-600 space-y-2">
-                        {route.routeType === 'via' ? (
-                          <div className="space-y-1">
-                            {route.legs.map((leg, i) => (
-                              <div key={i} className="p-2 rounded border bg-white">
-                                <div className="text-sm font-semibold text-gray-800">
-                                  {leg.routeName}
+                      {/* Transfer Route */}
+                      {!route.isDirect && route.legs && (
+                        <div className="p-3 space-y-2">
+                          {route.legs.map((leg, legIdx) => (
+                            <div key={legIdx}>
+                              <div className="bg-white rounded-lg p-2 border border-gray-200">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-lg">{leg.routeType === 'airway' ? '✈️' : '🚍'}</span>
+                                  <div
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: leg.routeColor }}
+                                  />
+                                  <div className="font-semibold text-gray-800 text-xs">
+                                    Leg {legIdx + 1}: {leg.routeName.split(':')[0]}
+                                  </div>
                                 </div>
-                                <div className="text-xs text-gray-600">
-                                  {i === 0 ? `📍 From: ${leg.startStop} → ${leg.endStop}` : `📍 From: ${leg.startStop} → ${leg.endStop}`}
-                                </div>
-                                <div className="text-xs mt-1">
-                                  <span className="font-semibold">🛑 {leg.stopsCount} stops</span>
-                                  <span className="ml-2 font-semibold text-blue-600">⏱️ ~{leg.estimatedTime} min</span>
+                                <div className="text-xs text-gray-600 ml-6">
+                                  <div>📍 {leg.startStop} → 🏁 {leg.endStop}</div>
+                                  <div className="mt-1">
+                                    <span className="font-semibold">{leg.stopsCount} stops</span>
+                                    <span className="mx-2">•</span>
+                                    <span className="text-blue-600 font-semibold">{leg.estimatedTime} min</span>
+                                  </div>
                                 </div>
                               </div>
-                            ))}
-                            <div className="mt-1 text-xs text-gray-700">
-                              <strong>Total:</strong> ⏱️ ~{route.estimatedTime} min • 🛑 {route.stopsCount} stops
+
+                              {/* Transfer Point */}
+                              {legIdx < route.legs.length - 1 && (
+                                <div className="flex items-center justify-center py-1">
+                                  <div className="bg-yellow-100 border-2 border-yellow-400 rounded-full px-3 py-1 text-xs font-bold text-yellow-800 flex items-center gap-1">
+                                    🔄 Transfer at {route.transferPoint}
+                                    <span className="text-yellow-600">({route.transferWaitTime} min wait)</span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex justify-between">
-                              <span>📍 From: {route.startStop}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>🏁 To: {route.endStop}</span>
-                            </div>
-                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-300">
-                              <span className="font-semibold">
-                                🛑 {route.stopsCount} stops
-                              </span>
-                              <span className="font-semibold text-blue-600">
-                                ⏱️ ~{route.estimatedTime} min
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </motion.div>
                   ))}
                 </div>
@@ -263,8 +291,9 @@ const RouteOptimizer = () => {
                   animate={{ opacity: 1 }}
                   className="p-3 bg-yellow-50 border border-yellow-200 rounded-md"
                 >
-                  <p className="text-sm text-yellow-800">
-                     No direct routes found. You may need to transfer between routes.
+                  <p className="text-sm text-yellow-800 flex items-center gap-2">
+                    <span>⚠️</span>
+                    No routes found between these stops. Try different locations.
                   </p>
                 </motion.div>
               )}

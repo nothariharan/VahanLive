@@ -60,7 +60,7 @@ router.get('/stops', (req, res) => {
   }
 });
 
-// Optimize route between two stops
+// Optimize route between two stops (with multi-route support)
 router.post('/optimize-route', (req, res) => {
   try {
     const { startStopId, endStopId } = req.body;
@@ -82,93 +82,30 @@ router.post('/optimize-route', (req, res) => {
     const optimalRoutes = findOptimalRoute(startStopId, endStopId);
     
     if (optimalRoutes.length === 0) {
-      // Try to find 2-leg (via) routes: route A (contains start), route B (contains end), with a common transfer stop
-      const routesContainingStart = routesData.filter(r => r.stops.some(s => s.id === startStopId));
-      const routesContainingEnd = routesData.filter(r => r.stops.some(s => s.id === endStopId));
-      const viaSuggestions = [];
-
-      routesContainingStart.forEach(r1 => {
-        routesContainingEnd.forEach(r2 => {
-          if (r1.id === r2.id) return; // already considered as direct
-
-          const r1StopIds = r1.stops.map(s => s.id);
-          const r2StopIds = r2.stops.map(s => s.id);
-          const common = r1StopIds.filter(id => r2StopIds.includes(id));
-
-          common.forEach(transferId => {
-            const startIndexA = r1.stops.findIndex(s => s.id === startStopId);
-            const transferIndexA = r1.stops.findIndex(s => s.id === transferId);
-            const stopsCountA = Math.abs(transferIndexA - startIndexA);
-            const estA = r1.type === 'airway' ? (parseInt(r1.schedule.duration) || 0) * 60 : stopsCountA * 12;
-
-            const transferIndexB = r2.stops.findIndex(s => s.id === transferId);
-            const endIndexB = r2.stops.findIndex(s => s.id === endStopId);
-            const stopsCountB = Math.abs(endIndexB - transferIndexB);
-            const estB = r2.type === 'airway' ? (parseInt(r2.schedule.duration) || 0) * 60 : stopsCountB * 12;
-
-            const total = estA + estB;
-
-            viaSuggestions.push({
-              routeId: `${r1.id}+${r2.id}`,
-              routeName: `${r1.name} → ${r2.name}`,
-              routeColor: r1.color,
-              routeType: 'via',
-              legs: [
-                {
-                  routeId: r1.id,
-                  routeName: r1.name,
-                  routeColor: r1.color,
-                  routeType: r1.type,
-                  startStop: r1.stops[startIndexA].name,
-                  endStop: r1.stops[transferIndexA].name,
-                  stopsCount: stopsCountA,
-                  estimatedTime: estA
-                },
-                {
-                  routeId: r2.id,
-                  routeName: r2.name,
-                  routeColor: r2.color,
-                  routeType: r2.type,
-                  startStop: r2.stops[transferIndexB].name,
-                  endStop: r2.stops[endIndexB].name,
-                  stopsCount: stopsCountB,
-                  estimatedTime: estB
-                }
-              ],
-              stopsCount: stopsCountA + stopsCountB,
-              estimatedTime: total
-            });
-          });
-        });
-      });
-
-      if (viaSuggestions.length > 0) {
-        return res.json({
-          success: true,
-          data: {
-            message: 'No direct routes found. Suggested 2-leg (via) routes:',
-            suggestedRoutes: viaSuggestions,
-            requiresTransfer: true
-          }
-        });
-      }
-
       return res.json({
         success: true,
         data: {
-          message: 'No direct routes found. Consider multi-route journey.',
+          message: 'No routes found between these stops. Please try different locations.',
           suggestedRoutes: [],
-          requiresTransfer: true
+          requiresTransfer: false
         }
       });
     }
 
+    // Separate direct and transfer routes
+    const directRoutes = optimalRoutes.filter(r => r.isDirect);
+    const transferRoutes = optimalRoutes.filter(r => !r.isDirect);
+
     res.json({
       success: true,
       data: {
-        message: `Found ${optimalRoutes.length} route(s)`,
+        message: directRoutes.length > 0 
+          ? `Found ${directRoutes.length} direct route(s)` 
+          : `Found ${transferRoutes.length} route(s) with transfers`,
         suggestedRoutes: optimalRoutes,
-        bestRoute: optimalRoutes[0]
+        bestRoute: optimalRoutes[0],
+        hasDirectRoute: directRoutes.length > 0,
+        hasTransferRoute: transferRoutes.length > 0
       }
     });
   } catch (error) {

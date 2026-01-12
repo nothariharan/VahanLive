@@ -245,22 +245,22 @@ export const activeBuses = [
   { busId: 'I5-404', routeId: 'airway_4', startIndex: 0, speed: 4, type: 'airway' }
 ];
 
-// Helper function to find routes between two stops
+// Helper function to find routes between two stops (with multi-route support)
 export function findOptimalRoute(startStopId, endStopId) {
   const results = [];
   
+  // 1. Check for DIRECT routes
   routesData.forEach(route => {
     const startIndex = route.stops.findIndex(stop => stop.id === startStopId);
     const endIndex = route.stops.findIndex(stop => stop.id === endStopId);
     
     if (startIndex !== -1 && endIndex !== -1) {
       const stopsCount = Math.abs(endIndex - startIndex);
-      // Calculate time based on type
       let estimatedTime;
       if (route.type === 'airway') {
-        estimatedTime = parseInt(route.schedule.duration) * 60; // Convert hours to minutes
+        estimatedTime = parseInt(route.schedule.duration) * 60;
       } else {
-        estimatedTime = stopsCount * 12; // 12 minutes per stop for bus
+        estimatedTime = stopsCount * 12;
       }
       
       results.push({
@@ -277,13 +277,126 @@ export function findOptimalRoute(startStopId, endStopId) {
     }
   });
   
-  // Sort: Bus routes first (by stops), then airways (by time)
+  // 2. If no direct routes, find TRANSFER routes (one transfer)
+  if (results.length === 0) {
+    const transferRoutes = findTransferRoutes(startStopId, endStopId);
+    results.push(...transferRoutes);
+  }
+  
+  // Sort: Direct routes first, then by time
   return results.sort((a, b) => {
-    if (a.routeType === b.routeType) {
-      return a.routeType === 'bus' ? a.stopsCount - b.stopsCount : a.estimatedTime - b.estimatedTime;
-    }
-    return a.routeType === 'bus' ? -1 : 1;
+    if (a.isDirect && !b.isDirect) return -1;
+    if (!a.isDirect && b.isDirect) return 1;
+    return a.estimatedTime - b.estimatedTime;
   });
+}
+
+// Find routes that require ONE transfer
+function findTransferRoutes(startStopId, endStopId) {
+  const transferOptions = [];
+  
+  // Find all routes containing the start stop
+  const routesFromStart = routesData.filter(route => 
+    route.stops.some(stop => stop.id === startStopId)
+  );
+  
+  // Find all routes containing the end stop
+  const routesToEnd = routesData.filter(route => 
+    route.stops.some(stop => stop.id === endStopId)
+  );
+  
+  // Find common stops between these routes (potential transfer points)
+  routesFromStart.forEach(route1 => {
+    routesToEnd.forEach(route2 => {
+      if (route1.id === route2.id) return; // Skip if same route
+      
+      // Find common stops (transfer points)
+      const commonStops = route1.stops.filter(stop1 =>
+        route2.stops.some(stop2 => stop2.id === stop1.id)
+      );
+      
+      commonStops.forEach(transferStop => {
+        // Calculate first leg (start → transfer)
+        const startIndexLeg1 = route1.stops.findIndex(s => s.id === startStopId);
+        const transferIndexLeg1 = route1.stops.findIndex(s => s.id === transferStop.id);
+        const stopsLeg1 = Math.abs(transferIndexLeg1 - startIndexLeg1);
+        
+        // Calculate second leg (transfer → end)
+        const transferIndexLeg2 = route2.stops.findIndex(s => s.id === transferStop.id);
+        const endIndexLeg2 = route2.stops.findIndex(s => s.id === endStopId);
+        const stopsLeg2 = Math.abs(endIndexLeg2 - transferIndexLeg2);
+        
+        // Calculate times
+        let timeLeg1, timeLeg2;
+        if (route1.type === 'airway') {
+          timeLeg1 = parseInt(route1.schedule.duration) * 60;
+        } else {
+          timeLeg1 = stopsLeg1 * 12;
+        }
+        
+        if (route2.type === 'airway') {
+          timeLeg2 = parseInt(route2.schedule.duration) * 60;
+        } else {
+          timeLeg2 = stopsLeg2 * 12;
+        }
+        
+        const transferWaitTime = 15; // 15 min transfer time
+        const totalTime = timeLeg1 + transferWaitTime + timeLeg2;
+        const totalStops = stopsLeg1 + stopsLeg2;
+        
+        // Get stop names
+        const startStopName = route1.stops[startIndexLeg1].name;
+        const endStopName = route2.stops[endIndexLeg2].name;
+        
+        transferOptions.push({
+          routeId: `${route1.id}_via_${route2.id}`,
+          routeName: `${route1.name.split(':')[0]} → ${route2.name.split(':')[0]}`,
+          routeColor: route1.color,
+          routeType: 'via',
+          startStop: startStopName,
+          endStop: endStopName,
+          transferPoint: transferStop.name,
+          stopsCount: totalStops,
+          estimatedTime: totalTime,
+          isDirect: false,
+          legs: [
+            {
+              routeId: route1.id,
+              routeName: route1.name,
+              routeColor: route1.color,
+              routeType: route1.type,
+              startStop: startStopName,
+              endStop: transferStop.name,
+              stopsCount: stopsLeg1,
+              estimatedTime: timeLeg1
+            },
+            {
+              routeId: route2.id,
+              routeName: route2.name,
+              routeColor: route2.color,
+              routeType: route2.type,
+              startStop: transferStop.name,
+              endStop: endStopName,
+              stopsCount: stopsLeg2,
+              estimatedTime: timeLeg2
+            }
+          ],
+          transferWaitTime: transferWaitTime
+        });
+      });
+    });
+  });
+  
+  // Remove duplicates and sort by time
+  const unique = transferOptions.filter((option, index, self) =>
+    index === self.findIndex(t => 
+      t.legs[0].routeId === option.legs[0].routeId &&
+      t.legs[1].routeId === option.legs[1].routeId &&
+      t.transferPoint === option.transferPoint
+    )
+  );
+  
+  return unique.sort((a, b) => a.estimatedTime - b.estimatedTime);
 }
 
 // Get all unique stops across all routes
