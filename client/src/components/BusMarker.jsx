@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { interpolatePosition, easeInOutCubic } from '../utils/interpolation';
-
 const BusMarker = ({ bus, routeColor }) => {
   const [currentPosition, setCurrentPosition] = useState(bus.position);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -10,24 +9,23 @@ const BusMarker = ({ bus, routeColor }) => {
   const startPositionRef = useRef(bus.position);
   const targetPositionRef = useRef(bus.position);
 
-  // Create custom bus icon
-  const busIcon = L.divIcon({
-    className: 'custom-bus-marker',
+  // create custom vehicle icon (bus or airplane based on route type)
+  const vehicleIcon = L.divIcon({
+    className: 'custom-vehicle-marker',
     html: `
-      <div style="position: relative; transform: rotate(${bus.heading || 0}deg);">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="16" cy="16" r="14" fill="${routeColor}" opacity="0.2"/>
-          <circle cx="16" cy="16" r="10" fill="${routeColor}"/>
-          <path d="M16 8L20 12H12L16 8Z" fill="white"/>
-          <circle cx="16" cy="16" r="2" fill="white"/>
-        </svg>
+      <div class="vehicle-rot-wrapper" style="position: relative; transform: rotate(${bus.heading || 0}deg);">
+        <div class="vehicle-scale-wrapper" style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;">
+          <div style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${routeColor};">
+            <div class="vehicle-emoji" style="font-size:16px;line-height:1;color:white;">${bus.type === 'airway' ? '✈️' : '🚌'}</div>
+          </div>
+        </div>
       </div>
     `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
   });
 
-  // Smooth animation using requestAnimationFrame
+  // smooth animation using requestAnimationFrame
   useEffect(() => {
     if (
       bus.position.lat !== targetPositionRef.current.lat ||
@@ -37,7 +35,18 @@ const BusMarker = ({ bus, routeColor }) => {
       targetPositionRef.current = bus.position;
       setIsAnimating(true);
 
-      const duration = 3000; // 3 seconds to match server update interval
+      const calculateDuration = () => {
+        const start = startPositionRef.current;
+        const target = targetPositionRef.current;
+        const distance = haversineMeters(start, target); // meters
+        const speed_m_s = Math.max((bus.speed || 5) * 1000 / 3600, 0.1); // m/s
+        const rawDurationMs = (distance / speed_m_s) * 1000; // ms
+        const TIME_SCALE = 60; // compress real world time by this factor for UI
+        const scaled = Math.max(800, Math.min(rawDurationMs / TIME_SCALE, 120000));
+        return scaled;
+      };
+
+      const duration = calculateDuration();
       const startTime = Date.now();
 
       const animate = () => {
@@ -71,10 +80,10 @@ const BusMarker = ({ bus, routeColor }) => {
   }, [bus.position]);
 
   return (
-    <Marker position={[currentPosition.lat, currentPosition.lng]} icon={busIcon}>
+    <Marker position={[currentPosition.lat, currentPosition.lng]} icon={vehicleIcon}>
       <Popup>
         <div className="p-2">
-          <h3 className="font-bold text-lg mb-2">Bus {bus.busId}</h3>
+          <h3 className="font-bold text-lg mb-2">{bus.type === 'airway' ? 'Flight' : 'Bus'} {bus.busId}</h3>
           <div className="space-y-1 text-sm">
             <p><span className="font-semibold">Route:</span> {bus.routeId}</p>
             <p><span className="font-semibold">Speed:</span> {bus.speed} km/h</p>
@@ -92,3 +101,24 @@ const BusMarker = ({ bus, routeColor }) => {
 };
 
 export default BusMarker;
+
+// thank you ai for the formula lol
+function haversineMeters(coords1, coords2) {
+  const toRad = (x) => (x * Math.PI) / 180;
+  const R = 6371e3; // Earth radius in meters
+
+  const lat1 = coords1.lat || coords1.latitude;
+  const lon1 = coords1.lng || coords1.longitude;
+  const lat2 = coords2.lat || coords2.latitude;
+  const lon2 = coords2.lng || coords2.longitude;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}

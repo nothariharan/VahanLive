@@ -105,7 +105,7 @@ function App() {
         onClick={() => setSidebarOpen(!sidebarOpen)}
         className="fixed top-4 z-[2000] bg-white rounded-full p-3 shadow-lg hover:shadow-xl transition-all"
         animate={{ left: sidebarOpen ? '336px' : '16px' }}
-        transition={{ duration: 0.3, type: 'spring', damping: 25 }}
+        transition={{ duration: 9, type: 'spring', damping: 100 }} //check for styling here
       >
         <motion.svg
           animate={{ rotate: sidebarOpen ? 0 : 180 }}
@@ -142,9 +142,24 @@ function App() {
                 transition={{ delay: 0.2 }}
                 className="mb-4"
               >
-                <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-2">
-                  🇮🇳 India Transport Tracker
-                </h1>
+
+                {/* we are cooking here for the h1 still doing */}
+                <motion.h1
+                  className="text-2xl font-extrabold cursor-pointer w-fit mb-2"
+                  initial={{ scale: 1 }}
+                  whileHover={{ 
+                    scale: 1.05,
+                    textShadow: "0px 0px 8px rgba(37, 99, 235, 0.5)" // blue glow here
+                    }}
+                    whileTap={{ scale: 0.95 }} 
+                  transition={{ type: "spring", stiffness: 300 }}
+>
+                  <span className="mr-2 inline-block">🇮🇳</span>
+  
+                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 bg-[length:200%_auto] hover:animate-gradient hover:from-blue-600 hover:to-purple-600 transition-all duration-300">
+                      India Transport Tracker
+                    </span>
+                    </motion.h1>
                 <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
                   <motion.div
                     animate={{

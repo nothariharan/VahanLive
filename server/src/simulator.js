@@ -23,8 +23,10 @@ activeBuses.forEach(bus => {
     direction: 'forward', // forward or backward
     route: route,
     currentPosition: route.path[bus.startIndex],
-    speed: 50, // km/h
-    passengers: Math.floor(Math.random() * 30) + 5
+    // Use provided realistic speeds from data (buses slower, airways slower in coordinate movement)
+    speed: bus.speed || 50, // km/h
+    passengers: Math.floor(Math.random() * 30) + 5,
+    type: bus.type || route.type || 'bus'
   });
 });
 
@@ -70,6 +72,7 @@ function simulateBusMovement() {
       heading: calculateHeading(state),
       speed: state.speed,
       passengers: state.passengers,
+      type: state.type, // include vehicle type so clients render correct icons
       timestamp: new Date().toISOString()
     };
 
@@ -115,6 +118,7 @@ io.on('connection', (socket) => {
           heading: calculateHeading(state),
           speed: state.speed,
           passengers: state.passengers,
+          type: state.type,
           timestamp: new Date().toISOString()
         });
       }
