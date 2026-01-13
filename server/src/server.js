@@ -40,6 +40,19 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${socket.id}`);
   });
+  // Add this inside your io.on('connection') block
+
+socket.on('driver_location_update', (data) => {
+    // 1. (Optional) Save to Database here if you want persistent history
+    
+    // 2. Broadcast immediately to all 'Passenger' users
+    // This sends the data to everyone looking at the map
+    io.emit('bus_location_update', data); 
+});
+
+socket.on('driver_disconnected', (data) => {
+    io.emit('bus_disconnected', { busId: data.busId });
+});
 });
 
 // Initialize seat manager (imports placed here to avoid circulars)
