@@ -4,12 +4,12 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose'; // Added Mongoose
+import mongoose from 'mongoose'; 
 
 // Import Routes & Models
 import apiRoutes from './routes/api.js';
-import Route from './models/Route.js'; // Ensure file extension is .js
-import Bus from './models/Bus.js';     // Ensure file extension is .js
+import Route from './models/Route.js'; 
+import Bus from './models/Bus.js';     
 import { initSeatManager } from './seatManager.js';
 
 dotenv.config();
@@ -31,7 +31,13 @@ app.use(express.json());
 app.use('/api', apiRoutes);
 
 // --- 1. DATABASE CONNECTION ---
-const MONGO_URI = "mongodb+srv://nothariharan_db_user:b22koDtipSBADiqi@vahanlive.4fskdj9.mongodb.net/?appName=VahanLive";
+// We now access the URI safely from the environment variables
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+  console.error("❌ FATAL ERROR: MONGO_URI is not defined in .env file");
+  process.exit(1); // Stop the server if no DB connection string is found
+}
 
 mongoose.connect(MONGO_URI)
   .then(() => {
@@ -42,7 +48,6 @@ mongoose.connect(MONGO_URI)
 
 
 // --- 2. IN-MEMORY STATE (The "Fast Lane") ---
-// We use this Map for instant speed, syncing to DB in background
 const activeDrivers = new Map();
 const activeRoutes = new Map();
 
