@@ -1,67 +1,98 @@
-import { createServer } from 'http';
-import { Server } from 'socket.io';
+import { io } from 'socket.io-client'; // Import Client, not Server
 import { routesData, activeBuses } from './data/routesData.js';
+import dotenv from 'dotenv';
 
-const httpServer = createServer();
-const io = new Server(httpServer, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
-});
+dotenv.config();
+
+// 1. Connect to the MAIN Server (Localhost or Production)
+// Use the variable from .env, or default to local for testing
+const SERVER_URL = process.env.SERVER_URL || 'http://localhost:5000';
+console.log(`🔌 Connecting Simulator to: ${SERVER_URL}`);
+
+const socket = io(SERVER_URL);
 
 // bus state tracking
 const busStates = new Map();
 
-// initialize bus states
+// Initialize bus states (Local state for the bot)
 activeBuses.forEach(bus => {
   const route = routesData.find(r => r.id === bus.routeId);
-  busStates.set(bus.busId, {
-    busId: bus.busId,
-    routeId: bus.routeId,
-    currentIndex: bus.startIndex,
-    direction: 'forward', // forward or backward
-    route: route,
-    currentPosition: route.path[bus.startIndex],
-    // Use provided realistic speeds from data (buses slower, airways slower in coordinate movement)
-    speed: bus.speed || 50, // km/h
-    passengers: Math.floor(Math.random() * 30) + 5,
-    type: bus.type || route.type || 'bus'
+  if (route) {
+    busStates.set(bus.busId, {
+      busId: bus.busId,
+      routeId: bus.routeId,
+      routeName: route.name, // Added for registration
+      currentIndex: bus.startIndex || 0,
+      direction: 'forward',
+      route: route,
+      currentPosition: route.path[bus.startIndex || 0],
+      speed: bus.speed || 50,
+      passengers: Math.floor(Math.random() * 30) + 5,
+      type: bus.type || route.type || 'bus'
+    });
+  }
+});
+
+// --- CONNECTION EVENTS ---
+
+socket.on('connect', () => {
+  console.log(`✅ Simulator Connected! ID: ${socket.id}`);
+  
+  // 2. Register all ghost buses with the main server
+  busStates.forEach((state) => {
+    console.log(`✨ Registering bus: ${state.busId} on route ${state.routeId}`);
+    
+    // Tell the server this driver is "Active"
+    socket.emit('driver_started', {
+      busId: state.busId,
+      routeName: state.routeName,
+      routeId: state.routeId,
+      type: state.type
+    });
   });
 });
 
-// Simulate bus movement
+socket.on('disconnect', () => {
+  console.log('❌ Disconnected from Main Server');
+});
+
+// --- MOVEMENT LOGIC ---
+
 function simulateBusMovement() {
+  if (!socket.connected) return;
+
   busStates.forEach((state, busId) => {
     const route = state.route;
     let nextIndex;
 
-    // Determine next position based on direction
+    // Determine next position
     if (state.direction === 'forward') {
       nextIndex = state.currentIndex + 1;
       if (nextIndex >= route.path.length) {
-        // Reached end, reverse direction
         state.direction = 'backward';
         nextIndex = route.path.length - 2;
       }
     } else {
       nextIndex = state.currentIndex - 1;
       if (nextIndex < 0) {
-        // Reached start, reverse direction
         state.direction = 'forward';
         nextIndex = 1;
       }
     }
 
+    // Safety check for undefined path points
+    if (!route.path[nextIndex]) return;
+
     state.currentIndex = nextIndex;
     state.currentPosition = route.path[nextIndex];
 
-    // Randomly update passengers
+    // Randomize passengers slightly
     if (Math.random() > 0.7) {
       state.passengers = Math.max(0, state.passengers + (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3));
     }
 
-    // Emit location update
+    // 3. Send Update to Main Server
+    // The server will take this and broadcast it to the Frontend
     const updateData = {
       busId: state.busId,
       routeId: state.routeId,
@@ -72,16 +103,20 @@ function simulateBusMovement() {
       heading: calculateHeading(state),
       speed: state.speed,
       passengers: state.passengers,
-      type: state.type, // include vehicle type so clients render correct icons
+      type: state.type,
       timestamp: new Date().toISOString()
     };
 
-    io.to(`route_${state.routeId}`).emit('location_update', updateData);
-    console.log(`Bus ${busId} updated: [${updateData.position.lat.toFixed(4)}, ${updateData.position.lng.toFixed(4)}]`);
+    // Emit to server
+    socket.emit('driver_location_update', updateData);
+    
+    // Optional: Log every few updates to avoid console spam
+    if (Math.random() > 0.95) {
+       console.log(`📍 ${state.busId} moved to [${updateData.position.lat.toFixed(4)}, ${updateData.position.lng.toFixed(4)}]`);
+    }
   });
 }
 
-// Calculate heading (bearing) between current and previous position
 function calculateHeading(state) {
   const route = state.route;
   const currentIdx = state.currentIndex;
@@ -98,45 +133,8 @@ function calculateHeading(state) {
   return Math.atan2(dLng, dLat) * (180 / Math.PI);
 }
 
-io.on('connection', (socket) => {
-  console.log(`[Simulator] Client connected: ${socket.id}`);
-
-  socket.on('subscribe_route', (routeId) => {
-    socket.join(`route_${routeId}`);
-    console.log(`[Simulator] Client ${socket.id} subscribed to route ${routeId}`);
-    
-    // send initial positions of all buses on this route
-    busStates.forEach((state) => {
-      if (state.routeId === routeId) {
-        socket.emit('location_update', {
-          busId: state.busId,
-          routeId: state.routeId,
-          position: {
-            lat: state.currentPosition[0],
-            lng: state.currentPosition[1]
-          },
-          heading: calculateHeading(state),
-          speed: state.speed,
-          passengers: state.passengers,
-          type: state.type,
-          timestamp: new Date().toISOString()
-        });
-      }
-    });
-  });
-
-  socket.on('disconnect', () => {
-    console.log(`[Simulator] Client disconnected: ${socket.id}`);
-  });
-});
-
-// start simulation interval (every 3 seconds)
+// Start simulation loop (Every 3 seconds)
 const SIMULATION_INTERVAL = 3000;
 setInterval(simulateBusMovement, SIMULATION_INTERVAL);
-//console messages to know in case of errors (for sanity tbh lol)
-const PORT = 5001;
-httpServer.listen(PORT, () => {
-  console.log(` Bus Simulator running on port ${PORT}`);
-  console.log(`simulating ${activeBuses.length} buses across ${routesData.length} routes`);
-  console.log(`update interval: ${SIMULATION_INTERVAL}ms`);
-});
+
+console.log(`🤖 Simulator Bot Initialized. Waiting for connection...`);
