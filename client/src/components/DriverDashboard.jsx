@@ -7,11 +7,11 @@ import { FaBus, FaRoute, FaSatelliteDish } from 'react-icons/fa';
 import { MdGpsFixed, MdStopCircle } from 'react-icons/md';
 import customBusIcon from '../assets/image_3.png'
 
-const SOCKET_URL = 'http://localhost:5000';
-const API_URL = 'http://localhost:5000';
+// FIX: Use 127.0.0.1 to avoid IPv6 timeout issues on Windows
+const SOCKET_URL = 'http://127.0.0.1:5000';
+const API_URL = 'http://127.0.0.1:5000';
 
 export default function DriverDashboard() {
-  // ... (State and Logic remain exactly the same) ...
   const [routes, setRoutes] = useState([]);
   const [allStops, setAllStops] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState('');
@@ -41,6 +41,27 @@ export default function DriverDashboard() {
   useEffect(() => {
     fetchRoutes();
     fetchStops();
+    
+    // Connect Socket
+    socketRef.current = io(SOCKET_URL, { 
+        transports: ['websocket'], // Force WebSocket to avoid polling errors
+        reconnectionAttempts: 5
+    });
+    
+    socketRef.current.on('connect', () => {
+        console.log('[Driver] Connected to Server');
+        setError(''); 
+    });
+    
+    socketRef.current.on('connect_error', (err) => {
+        console.error('Socket Error:', err);
+        setError('Cannot connect to server. Check if server is running.');
+    });
+
+    return () => { 
+        if (socketRef.current) socketRef.current.disconnect(); 
+        if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
   }, []);
 
   const fetchRoutes = async () => {
@@ -49,7 +70,6 @@ export default function DriverDashboard() {
       setRoutes(response.data.data || []);
     } catch (error) {
       console.error('Error fetching routes:', error);
-      setError('Failed to load routes');
     }
   };
 
@@ -68,13 +88,6 @@ export default function DriverDashboard() {
     return route ? route.stops : [];
   };
 
-  useEffect(() => {
-    socketRef.current = io(SOCKET_URL, { transports: ['websocket'] });
-    socketRef.current.on('connect', () => console.log('[Driver] Connected'));
-    socketRef.current.on('disconnect', () => console.log('[Driver] Disconnected'));
-    return () => { if (socketRef.current) socketRef.current.disconnect(); };
-  }, []);
-
   const validateForm = () => {
     if (!busId.trim()) { setError('Please enter a Bus ID'); return false; }
     if (!selectedRoute && !routeName.trim()) { setError('Please select a route or enter a live route name'); return false; }
@@ -85,47 +98,77 @@ export default function DriverDashboard() {
     return true;
   };
 
+  // --- FIXED START LOGIC ---
   const startDriving = (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-    if (!('geolocation' in navigator)) { setError('Geolocation is not supported by your browser'); return; }
+    if (!('geolocation' in navigator)) { setError('Geolocation is not supported'); return; }
 
-    if (routeName.trim()) {
-      setStatus(' Creating live route...');
-      if (socketRef.current && socketRef.current.connected) {
-        socketRef.current.emit('driver_started', { busId, routeName, type: 'bus' }, (resp) => {
-          if (resp && resp.ok && resp.route) {
-            setSelectedRoute(resp.route.id);
-            setStatus(' Live route created, initializing GPS...');
-            setTimeout(() => startGPS(resp.route.id), 350);
-          } else {
-            setError('Failed to create live route');
-            setStatus(' Idle');
-          }
-        });
-      } else {
-        setError('Socket not connected');
-      }
-      setIsDriving(true);
-      return;
-    }
+    setStatus('📡 Acquiring GPS Lock...');
+    
+    // 1. Get Initial GPS Lock FIRST (Before changing UI)
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude, longitude, heading, speed } = position.coords;
+            console.log("📍 GPS Locked:", latitude, longitude);
 
-    setIsDriving(true);
-    setStatus(' Initializing GPS...');
-    startGPS(selectedRoute);
+            // 2. Prepare Payload
+            const startPayload = {
+                busId,
+                routeId: selectedRoute || null, // If null, server creates live route
+                routeName: routeName || null,
+                type: 'bus',
+                position: { lat: latitude, lng: longitude },
+                heading: heading || 0,
+                speed: speed || 0
+            };
+
+            // 3. Send "Login" to Server (Crucial for DB Persistence)
+            if (socketRef.current && socketRef.current.connected) {
+                setStatus('⏳ Registering with Server...');
+                
+                socketRef.current.emit('driver_started', startPayload, (resp) => {
+                    // Server confirms we are registered
+                    if (resp && resp.ok) {
+                        if (resp.route) setSelectedRoute(resp.route.id); // Update if live route created
+                        
+                        // 4. Start Tracking Loop
+                        startGPS(resp.route ? resp.route.id : selectedRoute);
+                        setIsDriving(true);
+                    } else {
+                        setError('Server failed to register driver.');
+                        setStatus('Idle');
+                    }
+                });
+            } else {
+                setError('Socket disconnected. Reconnecting...');
+                socketRef.current.connect();
+            }
+        },
+        (err) => {
+            console.error("GPS Start Error:", err);
+            setError(`GPS Error: ${err.message}. Ensure Location is ALLOWED.`);
+            setStatus('GPS Failed');
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
-  const startGPS = (routeId) => {
-    const route = routes.find(r => r.id === routeId);
-    const startStopData = route?.stops.find(s => s.id === startStop);
-    const endStopData = route?.stops.find(s => s.id === endStop);
+  const startGPS = (activeRouteId) => {
+    const route = routes.find(r => r.id === activeRouteId);
+    const startStopData = route?.stops?.find(s => s.id === startStop) || allStops.find(s => s.id === startStop);
+    const endStopData = route?.stops?.find(s => s.id === endStop) || allStops.find(s => s.id === endStop);
+
+    // Clear existing watch if any
+    if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, heading, speed } = position.coords;
+        
         const locationData = {
           busId: busId,
-          routeId: routeId,
+          routeId: activeRouteId,
           position: { lat: latitude, lng: longitude },
           heading: heading || 0,
           speed: speed ? (speed * 3.6).toFixed(1) : 0, 
@@ -137,24 +180,23 @@ export default function DriverDashboard() {
         };
 
         setCurrentLocation(locationData);
-        setStatus(` Broadcasting: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        setStatus(`📡 Broadcasting Live`);
 
         if (socketRef.current && socketRef.current.connected) {
           socketRef.current.emit('driver_location_update', locationData);
         }
       },
       (error) => {
-        console.error('GPS Error:', error);
-        setStatus(` GPS Error: ${error.message}`);
-        setError(`GPS Error: ${error.message}`);
+        console.error('GPS Watch Error:', error);
+        setStatus(`⚠️ GPS Signal Lost`);
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0, distanceFilter: 5 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
   const stopDriving = () => {
     setIsDriving(false);
-    setStatus(' Stopped');
+    setStatus('Stopped');
     if (watchIdRef.current) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
@@ -172,7 +214,7 @@ export default function DriverDashboard() {
     return (
       <div className="min-h-screen w-full bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden text-white">
         
-        {/* Animated Background - GREEN THEME */}
+        {/* Animated Background */}
         <motion.div variants={blobVariants} animate="animate" className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-600/20 rounded-full blur-[120px]" />
         <motion.div variants={blobVariants} animate="animate" className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-teal-600/10 rounded-full blur-[120px]" />
         
@@ -184,14 +226,11 @@ export default function DriverDashboard() {
         >
           <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
             
-            {/* Header - GREEN GRADIENTS */}
+            {/* Header */}
             <div className="bg-gradient-to-r from-emerald-600/20 to-teal-600/20 p-8 text-center border-b border-white/10">
               <div className="w-26 h-26 mx-auto bg-emerald-500/20 rounded-full flex items-center justify-center mb-4">
-<img 
-                    src={customBusIcon} 
-                    alt="Bus and Plane Icon"
-                    className="w-32 h-32 object-contain"
-                  />              </div>
+                 <img src={customBusIcon} alt="Bus Icon" className="w-32 h-32 object-contain" />              
+              </div>
               <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-400">
                 Driver Console
               </h2>
@@ -215,8 +254,7 @@ export default function DriverDashboard() {
                   type="text"
                   placeholder="e.g. TN-01-BUS-1234"
                   value={busId}
-                  onChange={(e) => setBusId(e.target.value)}
-                  // Updated Focus rings to emerald
+                  onChange={(e) => setBusId(e.target.value.toUpperCase())}
                   className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all placeholder:text-slate-600"
                 />
               </div>
@@ -229,7 +267,6 @@ export default function DriverDashboard() {
                 <select
                   value={selectedRoute}
                   onChange={(e) => { setSelectedRoute(e.target.value); setStartStop(''); setEndStop(''); }}
-                  // Updated Focus rings to teal
                   className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all appearance-none"
                 >
                   <option value="" className="bg-slate-900">Select Designated Route</option>
@@ -257,7 +294,6 @@ export default function DriverDashboard() {
                         placeholder="e.g. Special Event Express"
                         value={routeName}
                         onChange={(e) => setRouteName(e.target.value)}
-                        // Changed focus to Teal for consistency
                         className="mt-3 w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all placeholder:text-slate-600"
                     />
                 </div>
@@ -297,14 +333,19 @@ export default function DriverDashboard() {
                 </div>
               )}
 
-              {/* Submit Button - GREEN GRADIENT */}
+              {/* Submit Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 type="submit"
-                className="w-full mt-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
+                disabled={status.includes('Acquiring') || status.includes('Registering')}
+                className={`w-full mt-4 py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${
+                    status.includes('Acquiring') 
+                    ? 'bg-slate-700 cursor-not-allowed text-slate-400'
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-emerald-500/25'
+                }`}
               >
-                <MdGpsFixed /> Go Live
+                {status.includes('Acquiring') ? 'Getting GPS...' : status.includes('Registering') ? 'Connecting...' : <><MdGpsFixed /> Go Live</>}
               </motion.button>
             </form>
           </div>
@@ -315,13 +356,13 @@ export default function DriverDashboard() {
 
   // --- Render Driving Screen ---
   const route = routes.find(r => r.id === selectedRoute);
-  const startStopData = route?.stops.find(s => s.id === startStop);
-  const endStopData = route?.stops.find(s => s.id === endStop);
+  const startStopData = route?.stops?.find(s => s.id === startStop) || allStops.find(s => s.id === startStop);
+  const endStopData = route?.stops?.find(s => s.id === endStop) || allStops.find(s => s.id === endStop);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-slate-950 text-white p-4 relative overflow-hidden">
       
-       {/* Animated Background - GREEN THEME */}
+       {/* Animated Background */}
        <motion.div variants={blobVariants} animate="animate" className="absolute top-0 left-0 w-full h-full bg-emerald-900/10 blur-[100px]" />
 
       <AnimatePresence>
@@ -330,18 +371,16 @@ export default function DriverDashboard() {
           animate={{ opacity: 1, scale: 1 }}
           className="relative z-10 text-center space-y-8 max-w-md w-full"
         >
-          {/* Pulsing Indicator - GREEN THEME */}
+          {/* Pulsing Indicator */}
           <div className="relative mx-auto w-40 h-40 flex items-center justify-center">
             <motion.div
               animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0, 0.3] }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
-              // Changed blur to emerald
               className="absolute inset-0 bg-emerald-500 rounded-full blur-xl"
             />
             <motion.div
               animate={{ scale: [1, 1.1, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
-              // Changed gradient to emerald/teal
               className="relative w-32 h-32 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center shadow-2xl border-4 border-slate-900"
             >
               <FaSatelliteDish className="text-5xl text-white" />
@@ -359,19 +398,16 @@ export default function DriverDashboard() {
               <div className="grid grid-cols-2 gap-4">
                   <div className="bg-white/5 rounded-xl p-3 text-left">
                       <p className="text-xs text-slate-400 uppercase">Bus ID</p>
-                      {/* Emerald Text */}
                       <p className="font-mono font-bold text-emerald-300">{busId}</p>
                   </div>
                   <div className="bg-white/5 rounded-xl p-3 text-left">
                       <p className="text-xs text-slate-400 uppercase">Speed</p>
-                      {/* Teal Text */}
                       <p className="font-mono font-bold text-teal-300">{currentLocation ? currentLocation.speed : 0} km/h</p>
                   </div>
               </div>
 
               <div className="bg-white/5 rounded-xl p-4 space-y-3">
                   <div className="flex items-center gap-3 text-left">
-                      {/* Emerald Icon BG and Color */}
                       <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
                           <FaRoute className="text-emerald-400 text-xs"/>
                       </div>
@@ -388,7 +424,6 @@ export default function DriverDashboard() {
                           <p className="text-sm font-medium">{startStopData?.name}</p>
                       </div>
                       <div className="relative">
-                          {/* Destination dot is already emerald, which is perfect */}
                           <div className="absolute -left-[21px] top-1 w-2 h-2 rounded-full bg-emerald-500"></div>
                           <p className="text-xs text-slate-400">Destination</p>
                           <p className="text-sm font-medium">{endStopData?.name}</p>
@@ -405,7 +440,6 @@ export default function DriverDashboard() {
             </div>
           </div>
 
-          {/* Status Message - Emerald Text */}
           <motion.p
             key={status}
             initial={{ opacity: 0, y: 5 }}
@@ -415,7 +449,6 @@ export default function DriverDashboard() {
             {status}
           </motion.p>
 
-          {/* Stop Button (Red is fine for danger action, or could be dark green) */}
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
