@@ -27,9 +27,17 @@ app.use('/api', apiRoutes);
 // Store active drivers (in-memory, use Redis in production)
 const activeDrivers = new Map();
 
+// Store live routes created by drivers (ephemeral)
+const activeRoutes = new Map();
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);
+
+  // Send currently active live routes to the newly connected client
+  if (activeRoutes.size > 0) {
+    socket.emit('active_routes', Array.from(activeRoutes.values()));
+  }
 
   // Passenger subscribing to route
   socket.on('subscribe_route', (routeId) => {
@@ -48,6 +56,33 @@ io.on('connection', (socket) => {
   socket.on('unsubscribe_route', (routeId) => {
     socket.leave(`route_${routeId}`);
     console.log(`Client ${socket.id} unsubscribed from route ${routeId}`);
+  });
+
+  // Driver starts a live route (create ephemeral route)
+  socket.on('driver_started', (payload, callback) => {
+    // payload: { busId, routeName, type }
+    const routeId = `live_${payload.busId}_${Date.now()}`;
+    const route = {
+      id: routeId,
+      name: payload.routeName || `Live ${payload.busId}`,
+      type: payload.type || 'bus',
+      color: '#34D399',
+      stops: [],
+      schedule: { frequency: 'Live' },
+      ownerBusId: payload.busId
+    };
+
+    activeRoutes.set(routeId, route);
+
+    // Inform all passengers about the new route
+    io.emit('new_route', route);
+
+    // Make the driver socket join the route room (optional but useful)
+    socket.join(`route_${routeId}`);
+
+    console.log(`➕ Live route created: ${route.name} (${routeId}) by ${payload.busId}`);
+
+    if (typeof callback === 'function') callback({ ok: true, route });
   });
 
   // Driver location update (REAL GPS DATA)
@@ -95,6 +130,15 @@ io.on('connection', (socket) => {
       
       // Remove from active drivers
       activeDrivers.delete(data.busId);
+
+      // If driver owned a live route, remove it and notify clients
+      for (const [routeId, route] of activeRoutes.entries()) {
+        if (route.ownerBusId === data.busId) {
+          activeRoutes.delete(routeId);
+          io.emit('route_removed', { id: routeId });
+          console.log(`➖ Live route removed: ${route.name} (${routeId})`);
+        }
+      }
     }
   });
 
@@ -110,6 +154,16 @@ io.on('connection', (socket) => {
           message: `Bus ${busId} has ended their route`
         });
         activeDrivers.delete(busId);
+
+        // Also remove any live route owned by this bus
+        for (const [routeId, route] of activeRoutes.entries()) {
+          if (route.ownerBusId === busId) {
+            activeRoutes.delete(routeId);
+            io.emit('route_removed', { id: routeId });
+            console.log(`➖ Live route removed (socket disconnect): ${route.name} (${routeId})`);
+          }
+        }
+
         break;
       }
     }

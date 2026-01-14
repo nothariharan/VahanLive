@@ -8,7 +8,8 @@ import RouteSelector from './RouteSelector';
 import RouteOptimizer from './RouteOptimizer';
 import SeatTracker from './SeatTracker';
 
-const SOCKET_URL = 'http://localhost:5001'; 
+const SERVER_SOCKET_URL = 'http://localhost:5000';
+const SIMULATOR_URL = 'http://localhost:5001';
 const API_URL = 'http://localhost:5000';
 
 function PassengerDashboard() {
@@ -16,6 +17,7 @@ function PassengerDashboard() {
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [buses, setBuses] = useState([]);
   const [socket, setSocket] = useState(null);
+  const [simSocket, setSimSocket] = useState(null);
   const [bankSocket, setBankSocket] = useState(null);
   const [seatsMap, setSeatsMap] = useState({});
   const [connectionStatus, setConnectionStatus] = useState('Disconnected');
@@ -39,37 +41,84 @@ function PassengerDashboard() {
     fetchRoutes();
   }, []);
 
-  // Setup Socket.io connection for location updates
+  // Setup Socket.io connections for server (real drivers & routes) and simulator (simulated buses)
   useEffect(() => {
-    const newSocket = io(SOCKET_URL, {
+    const serverSocket = io(SERVER_SOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5
     });
 
-    newSocket.on('connect', () => {
-      console.log('Connected to server');
+    const simSocket = io(SIMULATOR_URL, {
+      transports: ['websocket'],
+      reconnection: true
+    });
+
+    // Server socket (real drivers, live routes, seats)
+    serverSocket.on('connect', () => {
+      console.log('[ServerSocket] Connected');
       setConnectionStatus('Connected');
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('Disconnected from server');
+    serverSocket.on('disconnect', () => {
+      console.log('[ServerSocket] Disconnected');
       setConnectionStatus('Disconnected');
     });
 
-    // Handle location updates (both simulator and real drivers)
-    newSocket.on('location_update', (data) => {
-      console.log('Location update received:', data);
+    serverSocket.on('location_update', (data) => {
+      console.log('[Server] Location update received:', data);
       setBuses((prevBuses) => {
         const existingIndex = prevBuses.findIndex(b => b.busId === data.busId);
         if (existingIndex >= 0) {
           const updated = [...prevBuses];
-          updated[existingIndex] = {
-            ...updated[existingIndex],
-            ...data,
-            isRealDriver: data.isRealDriver || false
-          };
+          updated[existingIndex] = { ...updated[existingIndex], ...data, isRealDriver: data.isRealDriver || true };
+          return updated;
+        } else {
+          return [...prevBuses, { ...data, isRealDriver: data.isRealDriver || true }];
+        }
+      });
+    });
+
+    serverSocket.on('new_route', (route) => {
+      console.log('[Server] New live route:', route);
+      setRoutes((prev) => {
+        if (prev.some(r => r.id === route.id)) return prev;
+        return [...prev, route];
+      });
+    });
+
+    serverSocket.on('route_removed', ({ id }) => {
+      console.log('[Server] Live route removed:', id);
+      setRoutes((prev) => prev.filter(r => r.id !== id));
+      setBuses((prevB) => prevB.filter(b => b.routeId !== id));
+      if (selectedRoute?.id === id) setSelectedRoute(null);
+    });
+
+    serverSocket.on('active_routes', (routes) => {
+      console.log('[Server] Active routes:', routes);
+      setRoutes((prev) => {
+        const ids = new Set(prev.map(r => r.id));
+        const combined = [...prev];
+        for (const r of routes) {
+          if (!ids.has(r.id)) combined.push(r);
+        }
+        return combined;
+      });
+    });
+
+    // Simulator socket (simulated buses)
+    simSocket.on('connect', () => console.log('[SimSocket] Connected'));
+    simSocket.on('disconnect', () => console.log('[SimSocket] Disconnected'));
+
+    simSocket.on('location_update', (data) => {
+      // Simulated updates should be merged the same way
+      console.log('[Sim] Location update received:', data);
+      setBuses((prevBuses) => {
+        const existingIndex = prevBuses.findIndex(b => b.busId === data.busId);
+        if (existingIndex >= 0) {
+          const updated = [...prevBuses];
+          updated[existingIndex] = { ...updated[existingIndex], ...data };
           return updated;
         } else {
           return [...prevBuses, data];
@@ -77,28 +126,18 @@ function PassengerDashboard() {
       });
     });
 
-    // Handle bus disconnection
-    newSocket.on('bus_disconnected', (data) => {
-      console.log('Bus disconnected:', data);
-      setBuses((prevBuses) => prevBuses.filter(b => b.busId !== data.busId));
-      
-      // Show notification
-      if (data.message) {
-        // You can add a toast notification here
-        console.log('Notification:', data.message);
-      }
-    });
-
-    setSocket(newSocket);
+    setSocket(serverSocket);
+    setSimSocket(simSocket);
 
     return () => {
-      newSocket.close();
+      serverSocket.close();
+      simSocket.close();
     };
   }, []);
 
-  // Setup seat updates socket
+  // Setup seat updates socket (connect to main server)
   useEffect(() => {
-    const seatSocket = io(SOCKET_URL, { transports: ['websocket'] });
+    const seatSocket = io(SERVER_SOCKET_URL, { transports: ['websocket'] });
     setBankSocket(seatSocket);
 
     seatSocket.on('connect', () => console.log('[Seats] connected'));
@@ -126,15 +165,17 @@ function PassengerDashboard() {
     return () => seatSocket.close();
   }, []);
 
-  // Subscribe to route updates
+  // Subscribe to route updates (emit to both server and simulator sockets)
   useEffect(() => {
-    if (socket && selectedRoute) {
+    if ((socket || simSocket) && selectedRoute) {
       routes.forEach(route => {
-        socket.emit('unsubscribe_route', route.id);
+        if (socket) socket.emit('unsubscribe_route', route.id);
+        if (simSocket) simSocket.emit('unsubscribe_route', route.id);
       });
 
-      socket.emit('subscribe_route', selectedRoute.id);
-      
+      if (socket) socket.emit('subscribe_route', selectedRoute.id);
+      if (simSocket) simSocket.emit('subscribe_route', selectedRoute.id);
+
       // Filter buses for selected route
       setBuses((prevBuses) => 
         prevBuses.filter(bus => bus.routeId === selectedRoute.id)
@@ -145,7 +186,7 @@ function PassengerDashboard() {
       routes.forEach(route => bankSocket.emit('unsubscribe_route', route.id));
       bankSocket.emit('subscribe_route', selectedRoute.id);
     }
-  }, [socket, selectedRoute, routes, bankSocket]);
+  }, [socket, simSocket, selectedRoute, routes, bankSocket]);
 
   const activeBusesOnRoute = buses.filter(
     bus => bus.routeId === selectedRoute?.id
