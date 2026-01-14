@@ -1,5 +1,5 @@
 import { io } from 'socket.io-client'; // Import Client, not Server
-import { routesData, activeBuses } from './data/routesData.js';
+import { routesData, activeBuses } from './src/data/routesData.js';
 import dotenv from 'dotenv';
 
 dotenv.config();

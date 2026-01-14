@@ -1,14 +1,15 @@
 // client/src/components/LandingPage.jsx
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaMapMarkedAlt, FaSatelliteDish } from 'react-icons/fa';
+import { FaMapMarkedAlt } from 'react-icons/fa';
 import { MdGpsFixed } from "react-icons/md";
 // Ensure this path is correct based on your folder structure
 import customBusIcon from '../assets/image_3.png'
 
 export default function LandingPage() {
   return (
-    <div className="h-screen w-full bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden text-white">
+    // CHANGED: 'h-screen' -> 'min-h-screen', 'overflow-hidden' -> 'overflow-x-hidden', added 'py-12' for vertical spacing
+    <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center relative overflow-x-hidden text-white py-12">
       
       {/* --- Animated Background Elements --- */}
       {/* Blue Blob */}
@@ -33,10 +34,10 @@ export default function LandingPage() {
       />
       
       {/* Grid Pattern Overlay */}
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 mix-blend-overlay"></div>
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 mix-blend-overlay pointer-events-none"></div>
 
       {/* --- Main Content --- */}
-      <div className="z-10 text-center space-y-16 px-4">
+      <div className="z-10 text-center space-y-12 md:space-y-16 px-4 w-full max-w-7xl">
         
         {/* Title Section */}
         <motion.div
@@ -46,11 +47,11 @@ export default function LandingPage() {
           className="relative"
         >
 
-          
-          <h1 className="text-6xl md:text-8xl tracking-tight mb-6 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6">
+          {/* CHANGED: Text size responsive: text-5xl (mobile) -> md:text-8xl (desktop) */}
+          <h1 className="text-5xl md:text-8xl tracking-tight mb-6 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6">
             {/* Part 1: Vahan (Samarkan Font) */}
             <span 
-                className="bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500"
+                className="bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 py-2" // Added py-2 to prevent clipping of descenders
                 style={{ fontFamily: "'Samarkan', sans-serif", letterSpacing: '2px' }}
             >
               Vahan
@@ -59,20 +60,20 @@ export default function LandingPage() {
             {/* Part 2: Live (Classic Classy Font) */}
             <span 
                 className="font-light italic text-white/90"
-                style={{ fontFamily: "'Playfair Display', serif" }} // Or use standard sans-serif
+                style={{ fontFamily: "'Playfair Display', serif" }} 
             >
               Live
             </span>
           </h1>
 
-          <p className="font-serif italic text-slate-400 text-xl md:text-2xl font-light max-w-2xl mx-auto leading-relaxed tracking-wide">
-            "The next generation of public transport monitoring. <br />
-            <span className="text-slate-300">Real-time precision. Seamless connections.</span>"
+          <p className="font-serif italic text-slate-400 text-lg md:text-2xl font-light max-w-2xl mx-auto leading-relaxed tracking-wide">
+            "The next generation of public transport monitoring. <br className="hidden md:block" />
+            <span className="text-slate-300 block md:inline mt-2 md:mt-0">Real-time precision. Seamless connections.</span>"
           </p>
         </motion.div>
 
         {/* Action Cards Container */}
-        <div className="flex flex-col md:flex-row gap-8 items-center justify-center">
+        <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center justify-center pb-8">
           
           {/* 1. Passenger Card */}
           <Link to="/map">
@@ -82,19 +83,19 @@ export default function LandingPage() {
               transition={{ delay: 0.3 }}
               whileHover={{ scale: 1.05, translateY: -5 }}
               whileTap={{ scale: 0.95 }}
-              className="group relative w-72 h-80 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden hover:border-blue-500/50 transition-colors duration-500"
+              className="group relative w-full md:w-72 h-64 md:h-80 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden hover:border-blue-500/50 transition-colors duration-500"
             >
               {/* Hover Glow Effect */}
               <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-6">
-                <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
-                  <FaMapMarkedAlt className="text-4xl text-blue-400 group-hover:scale-110 transition-transform duration-300" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-4 md:space-y-6">
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-blue-500/10 rounded-full flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                  <FaMapMarkedAlt className="text-3xl md:text-4xl text-blue-400 group-hover:scale-110 transition-transform duration-300" />
                 </div>
                 
                 <div>
-                  <h3 className="text-2xl font-bold text-white mb-2">I am a Passenger</h3>
-                  <p className="text-sm text-slate-400 group-hover:text-blue-200 transition-colors">
+                  <h3 className="text-xl md:text-2xl font-bold text-white mb-2">I am a Passenger</h3>
+                  <p className="text-sm text-slate-400 group-hover:text-blue-200 transition-colors px-4">
                     Track buses, find routes, and plan your journey live.
                   </p>
                 </div>
@@ -114,25 +115,25 @@ export default function LandingPage() {
               transition={{ delay: 0.4 }}
               whileHover={{ scale: 1.05, translateY: -5 }}
               whileTap={{ scale: 0.95 }}
-              className="group relative w-72 h-80 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden hover:border-emerald-500/50 transition-colors duration-500"
+              className="group relative w-full md:w-72 h-64 md:h-80 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden hover:border-emerald-500/50 transition-colors duration-500"
             >
               {/* Hover Glow Effect */}
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-6">
-                <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-4 md:space-y-6">
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-500/10 rounded-full flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
                   
                   <img 
                     src={customBusIcon} 
                     alt="Bus and Plane Icon"
-                    className="w-16 h-16 object-contain group-hover:scale-110 transition-transform duration-300" 
+                    className="w-12 h-12 md:w-16 md:h-16 object-contain group-hover:scale-110 transition-transform duration-300" 
                   />
 
                 </div>
                 
                 <div>
-                  <h3 className="text-2xl font-bold text-white mb-2">I am a Driver</h3>
-                  <p className="text-sm text-slate-400 group-hover:text-emerald-200 transition-colors">
+                  <h3 className="text-xl md:text-2xl font-bold text-white mb-2">I am a Driver</h3>
+                  <p className="text-sm text-slate-400 group-hover:text-emerald-200 transition-colors px-4">
                     Broadcast your live GPS location to passengers.
                   </p>
                 </div>
