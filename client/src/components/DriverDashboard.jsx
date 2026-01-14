@@ -5,6 +5,7 @@ import io from 'socket.io-client';
 import axios from 'axios';
 import { FaBus, FaRoute, FaSatelliteDish } from 'react-icons/fa';
 import { MdGpsFixed, MdStopCircle } from 'react-icons/md';
+import customBusIcon from '../assets/image_3.png'
 
 const SOCKET_URL = 'http://localhost:5000';
 const API_URL = 'http://localhost:5000';
@@ -185,9 +186,12 @@ export default function DriverDashboard() {
             
             {/* Header - GREEN GRADIENTS */}
             <div className="bg-gradient-to-r from-emerald-600/20 to-teal-600/20 p-8 text-center border-b border-white/10">
-              <div className="w-16 h-16 mx-auto bg-emerald-500/20 rounded-full flex items-center justify-center mb-4">
-                <FaBus className="text-3xl text-emerald-400" />
-              </div>
+              <div className="w-26 h-26 mx-auto bg-emerald-500/20 rounded-full flex items-center justify-center mb-4">
+<img 
+                    src={customBusIcon} 
+                    alt="Bus and Plane Icon"
+                    className="w-32 h-32 object-contain"
+                  />              </div>
               <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-400">
                 Driver Console
               </h2>
