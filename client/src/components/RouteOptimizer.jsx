@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { FaRoute } from 'react-icons/fa';
 import { MdFindReplace } from 'react-icons/md';
+import { GoAlertFill } from 'react-icons/go';
 
 const RouteOptimizer = () => {
   const [stops, setStops] = useState([]);
@@ -329,7 +330,7 @@ const RouteOptimizer = () => {
                   className="p-3 bg-yellow-50 border border-yellow-200 rounded-md"
                 >
                   <p className="text-sm text-yellow-800 flex items-center gap-2">
-                    <span>⚠️</span>
+                    <span><GoAlertFill/></span>
                     No routes found between these stops. Try different locations.
                   </p>
                 </motion.div>

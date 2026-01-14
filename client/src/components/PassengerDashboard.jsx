@@ -1,4 +1,4 @@
-// client/src/App.jsx
+// client/src/App.jsx (PassengerDashboard)
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { io } from 'socket.io-client';
@@ -8,7 +8,7 @@ import RouteSelector from './RouteSelector';
 import RouteOptimizer from './RouteOptimizer';
 import SeatTracker from './SeatTracker';
 
-const SOCKET_URL = 'http://localhost:5001';
+const SOCKET_URL = 'http://localhost:5001'; 
 const API_URL = 'http://localhost:5000';
 
 function PassengerDashboard() {
@@ -16,8 +16,8 @@ function PassengerDashboard() {
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [buses, setBuses] = useState([]);
   const [socket, setSocket] = useState(null);
-  const [bankSocket, setBankSocket] = useState(null); // seat socket
-  const [seatsMap, setSeatsMap] = useState({}); // keyed by busId
+  const [bankSocket, setBankSocket] = useState(null);
+  const [seatsMap, setSeatsMap] = useState({});
   const [connectionStatus, setConnectionStatus] = useState('Disconnected');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [watchedRoutes, setWatchedRoutes] = useState([]);
@@ -39,7 +39,7 @@ function PassengerDashboard() {
     fetchRoutes();
   }, []);
 
-  // Setup Socket.io connection (simulator)
+  // Setup Socket.io connection for location updates
   useEffect(() => {
     const newSocket = io(SOCKET_URL, {
       transports: ['websocket'],
@@ -49,26 +49,44 @@ function PassengerDashboard() {
     });
 
     newSocket.on('connect', () => {
-      console.log('Connected to simulator');
+      console.log('Connected to server');
       setConnectionStatus('Connected');
     });
 
     newSocket.on('disconnect', () => {
-      console.log('Disconnected from simulator');
+      console.log('Disconnected from server');
       setConnectionStatus('Disconnected');
     });
 
+    // Handle location updates (both simulator and real drivers)
     newSocket.on('location_update', (data) => {
+      console.log('Location update received:', data);
       setBuses((prevBuses) => {
         const existingIndex = prevBuses.findIndex(b => b.busId === data.busId);
         if (existingIndex >= 0) {
           const updated = [...prevBuses];
-          updated[existingIndex] = data;
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            ...data,
+            isRealDriver: data.isRealDriver || false
+          };
           return updated;
         } else {
           return [...prevBuses, data];
         }
       });
+    });
+
+    // Handle bus disconnection
+    newSocket.on('bus_disconnected', (data) => {
+      console.log('Bus disconnected:', data);
+      setBuses((prevBuses) => prevBuses.filter(b => b.busId !== data.busId));
+      
+      // Show notification
+      if (data.message) {
+        // You can add a toast notification here
+        console.log('Notification:', data.message);
+      }
     });
 
     setSocket(newSocket);
@@ -78,9 +96,9 @@ function PassengerDashboard() {
     };
   }, []);
 
-  // Setup seat updates socket (server)
+  // Setup seat updates socket
   useEffect(() => {
-    const seatSocket = io('http://localhost:5000', { transports: ['websocket'] });
+    const seatSocket = io(SOCKET_URL, { transports: ['websocket'] });
     setBankSocket(seatSocket);
 
     seatSocket.on('connect', () => console.log('[Seats] connected'));
@@ -90,13 +108,14 @@ function PassengerDashboard() {
       setSeatsMap((prev) => ({ ...prev, [payload.busId]: payload }));
     });
 
-    // initial fetch
+    // Initial fetch
     (async () => {
       try {
-        const res = await (await fetch(`${API_URL}/api/seats`)).json();
-        if (res && res.data) {
+        const res = await fetch(`${API_URL}/api/seats`);
+        const data = await res.json();
+        if (data && data.data) {
           const map = {};
-          res.data.forEach((s) => (map[s.busId] = s));
+          data.data.forEach((s) => (map[s.busId] = s));
           setSeatsMap(map);
         }
       } catch (err) {
@@ -107,7 +126,7 @@ function PassengerDashboard() {
     return () => seatSocket.close();
   }, []);
 
-  // Subscribe to route updates (simulator + seat updates)
+  // Subscribe to route updates
   useEffect(() => {
     if (socket && selectedRoute) {
       routes.forEach(route => {
@@ -116,12 +135,12 @@ function PassengerDashboard() {
 
       socket.emit('subscribe_route', selectedRoute.id);
       
+      // Filter buses for selected route
       setBuses((prevBuses) => 
         prevBuses.filter(bus => bus.routeId === selectedRoute.id)
       );
     }
 
-    // subscribe seats socket
     if (bankSocket && selectedRoute) {
       routes.forEach(route => bankSocket.emit('unsubscribe_route', route.id));
       bankSocket.emit('subscribe_route', selectedRoute.id);
@@ -132,7 +151,6 @@ function PassengerDashboard() {
     bus => bus.routeId === selectedRoute?.id
   );
 
-  // helper: toggle watch on a route
   function toggleWatch(route) {
     setWatchedRoutes((prev) => {
       if (prev.some(r => r.id === route.id)) return prev.filter(r => r.id !== route.id);
@@ -140,7 +158,7 @@ function PassengerDashboard() {
     });
   }
 
-  // build a simple routeSeatsMap used for display in selectors and popups
+  // Build routeSeatsMap
   const routeSeatsMap = {};
   Object.values(seatsMap).forEach((s) => {
     if (!routeSeatsMap[s.routeId]) routeSeatsMap[s.routeId] = { available: 0, capacity: 0 };
@@ -156,37 +174,37 @@ function PassengerDashboard() {
 
   const busCount = buses.filter(b => b.type === 'bus').length;
   const flightCount = buses.filter(b => b.type === 'airway').length;
+  const realDriverCount = buses.filter(b => b.isRealDriver).length;
 
   return (
-    <div className="flex h-screen bg-linear-to-br from-gray-50 to-gray-100 relative">
-      {/* Toggle Button - Always visible */}
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 relative">
+      {/* Toggle Button */}
       <motion.button
-  whileHover={{ scale: 1.1, backgroundColor: "#eff6ff" }} 
-  whileTap={{ scale: 0.9 }}
-  onClick={() => setSidebarOpen(!sidebarOpen)}
-  className="fixed top-4 z-[2000] p-3 rounded-full shadow-xl 
-             bg-white/90 backdrop-blur-md border border-gray-200 
-             text-gray-700 hover:text-blue-600 hover:shadow-2xl hover:border-blue-200"
-  animate={{ left: sidebarOpen ? '336px' : '16px' }}
-
-  transition={{ type: "spring", stiffness: 400, damping: 25 }}
->
-  <motion.svg
-    animate={{ rotate: sidebarOpen ? 0 : 180 }}
-    transition={{ duration: 0.4, ease: "backOut" }} 
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2.5}
-      d="M15 19l-7-7 7-7" 
-    />
-  </motion.svg>
-</motion.button>
+        whileHover={{ scale: 1.1, backgroundColor: "#eff6ff" }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="fixed top-4 z-[2000] p-3 rounded-full shadow-xl 
+                   bg-white/90 backdrop-blur-md border border-gray-200 
+                   text-gray-700 hover:text-blue-600 hover:shadow-2xl hover:border-blue-200"
+        animate={{ left: sidebarOpen ? '336px' : '16px' }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      >
+        <motion.svg
+          animate={{ rotate: sidebarOpen ? 0 : 180 }}
+          transition={{ duration: 0.4, ease: "backOut" }}
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2.5}
+            d="M15 19l-7-7 7-7"
+          />
+        </motion.svg>
+      </motion.button>
 
       {/* Sidebar */}
       <AnimatePresence>
@@ -206,24 +224,21 @@ function PassengerDashboard() {
                 transition={{ delay: 0.2 }}
                 className="mb-4"
               >
-
-                {/* we are cooking here for the h1 still doing */}
                 <motion.h1
                   className="text-2xl font-extrabold cursor-pointer w-fit mb-2"
                   initial={{ scale: 1 }}
-                  whileHover={{ 
+                  whileHover={{
                     scale: 1.05,
-                    textShadow: "0px 0px 8px rgba(37, 99, 235, 0.5)" // blue glow here
-                    }}
-                    whileTap={{ scale: 0.95 }} 
+                    textShadow: "0px 0px 8px rgba(37, 99, 235, 0.5)"
+                  }}
+                  whileTap={{ scale: 0.95 }}
                   transition={{ type: "spring", stiffness: 300 }}
->
+                >
                   <span className="mr-2 inline-block">🇮🇳</span>
-  
-                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 bg-[length:200%_auto] hover:animate-gradient hover:from-blue-600 hover:to-purple-600 transition-all duration-300">
-                      India Transport Tracker
-                    </span>
-                    </motion.h1>
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 bg-[length:200%_auto] hover:animate-gradient hover:from-blue-600 hover:to-purple-600 transition-all duration-300">
+                    India Transport Tracker
+                  </span>
+                </motion.h1>
                 <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
                   <motion.div
                     animate={{
@@ -256,13 +271,13 @@ function PassengerDashboard() {
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ duration: 0.3 }}
                     className={`rounded-lg shadow-md p-4 mb-4 text-white ${
-                      selectedRoute.type === 'airway' 
-                        ? 'bg-gradient-to-r from-purple-500 to-purple-600' 
+                      selectedRoute.type === 'airway'
+                        ? 'bg-gradient-to-r from-purple-500 to-purple-600'
                         : 'bg-gradient-to-r from-blue-500 to-blue-600'
                     }`}
                   >
                     <h3 className="font-bold mb-2 flex items-center gap-2">
-                      <span>{selectedRoute.type === 'airway' ? '✈️' : '🚌'}</span> 
+                      <span>{selectedRoute.type === 'airway' ? '✈️' : '🚌'}</span>
                       Active {selectedRoute.type === 'airway' ? 'Flights' : 'Buses'}
                     </h3>
                     <motion.p
@@ -276,7 +291,7 @@ function PassengerDashboard() {
                     <p className="text-sm opacity-90 mt-1 truncate">
                       on {selectedRoute.name}
                     </p>
-                    
+
                     {/* Live Vehicle List */}
                     <div className="mt-3 space-y-2">
                       {activeBusesOnRoute.map((bus, idx) => (
@@ -290,6 +305,11 @@ function PassengerDashboard() {
                           <div className="flex justify-between items-center gap-2">
                             <span className="font-semibold flex items-center gap-1 truncate">
                               {bus.type === 'airway' ? '✈️' : '🚍'} {bus.busId}
+                              {bus.isRealDriver && (
+                                <span className="ml-1 px-1.5 py-0.5 bg-green-500 text-white text-[10px] rounded-full">
+                                  LIVE
+                                </span>
+                              )}
                             </span>
                             <span className={`px-2 py-1 rounded flex-shrink-0 ${
                               bus.isAtStop ? 'bg-red-500' : (bus.type === 'airway' ? 'bg-indigo-500' : 'bg-green-500')
@@ -311,7 +331,10 @@ function PassengerDashboard() {
               <RouteOptimizer />
 
               {/* Seat Tracker */}
-              <SeatTracker watchedRoutes={watchedRoutes} onRemoveWatch={(r)=> setWatchedRoutes((prev)=> prev.filter(x=> x.id !== r.id))} />
+              <SeatTracker
+                watchedRoutes={watchedRoutes}
+                onRemoveWatch={(r) => setWatchedRoutes((prev) => prev.filter(x => x.id !== r.id))}
+              />
             </div>
           </motion.div>
         )}
@@ -325,7 +348,7 @@ function PassengerDashboard() {
           seatsMap={seatsMap}
           routeSeatsMap={routeSeatsMap}
         />
-        
+
         {/* Floating Stats */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -346,6 +369,12 @@ function PassengerDashboard() {
               <span className="font-semibold">✈️ Flights:</span>
               <span className="text-purple-600 font-bold">{flightCount}</span>
             </div>
+            {realDriverCount > 0 && (
+              <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                <span className="font-semibold">🟢 Live Drivers:</span>
+                <span className="text-green-600 font-bold animate-pulse">{realDriverCount}</span>
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -373,6 +402,10 @@ function PassengerDashboard() {
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
               <span className="text-gray-600">Stopped</span>
+            </div>
+            <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
+              <span className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded">LIVE</span>
+              <span className="text-gray-600">Real Driver GPS</span>
             </div>
           </div>
         </motion.div>
