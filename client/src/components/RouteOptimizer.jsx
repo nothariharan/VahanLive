@@ -14,8 +14,7 @@ import {
 import { MdTimer, MdAirlineSeatReclineNormal } from 'react-icons/md';
 import { GoAlertFill } from 'react-icons/go';
 
-const API_URL = 'http://localhost:5000';
-
+import { API_URL } from '../config'; 
 const RouteOptimizer = () => {
   const [stops, setStops] = useState([]);
   const [startStop, setStartStop] = useState('');

@@ -4,8 +4,7 @@ import axios from 'axios';
 import { FaMagnifyingGlass } from 'react-icons/fa6';
 import { MdEventSeat, MdFlightClass, MdDirectionsBus, MdClose } from 'react-icons/md'; // Added generic icons for better UI
 
-const API_URL = 'http://localhost:5000';
-const SOCKET_URL = 'http://localhost:5000';
+import { API_URL,SOCKET_URL } from '../config';
 
 const SeatTracker = ({ watchedRoutes = [], onRemoveWatch }) => {
   const [socket, setSocket] = useState(null);
