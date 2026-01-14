@@ -6,10 +6,8 @@ import axios from 'axios';
 import { FaBus, FaRoute, FaSatelliteDish } from 'react-icons/fa';
 import { MdGpsFixed, MdStopCircle } from 'react-icons/md';
 import customBusIcon from '../assets/image_3.png'
+import { SOCKET_URL, API_URL } from '../config'
 
-// FIX: Use 127.0.0.1 to avoid IPv6 timeout issues on Windows
-const SOCKET_URL = 'http://127.0.0.1:5000';
-const API_URL = 'http://127.0.0.1:5000';
 
 export default function DriverDashboard() {
   const [routes, setRoutes] = useState([]);
@@ -112,15 +110,22 @@ export default function DriverDashboard() {
             const { latitude, longitude, heading, speed } = position.coords;
             console.log("📍 GPS Locked:", latitude, longitude);
 
+            // Determine if airway or bus to apply initial speed dampening
+            const selectedRouteData = routes.find(r => r.id === selectedRoute);
+            const isAirway = selectedRouteData?.type === 'airway';
+            // 0.6x for planes (little slower), 0.2x for buses (much slower)
+            const speedFactor = isAirway ? 0.6 : 0.2; 
+            const adjustedSpeed = (speed || 0) * speedFactor;
+
             // 2. Prepare Payload
             const startPayload = {
                 busId,
                 routeId: selectedRoute || null, // If null, server creates live route
                 routeName: routeName || null,
-                type: 'bus',
+                type: isAirway ? 'airway' : 'bus',
                 position: { lat: latitude, lng: longitude },
                 heading: heading || 0,
-                speed: speed || 0
+                speed: (adjustedSpeed * 3.6).toFixed(1) // Convert adjusted speed to km/h
             };
 
             // 3. Send "Login" to Server (Crucial for DB Persistence)
@@ -166,13 +171,20 @@ export default function DriverDashboard() {
       (position) => {
         const { latitude, longitude, heading, speed } = position.coords;
         
+        // --- SPEED CONTROL LOGIC ---
+        const isAirway = route?.type === 'airway';
+        // Factor 0.6 for planes (little slower), Factor 0.2 for buses (MUCH slower)
+        const speedMultiplier = isAirway ? 0.6 : 0.2; 
+        const adjustedSpeed = (speed || 0) * speedMultiplier;
+        // ---------------------------
+
         const locationData = {
           busId: busId,
           routeId: activeRouteId,
           position: { lat: latitude, lng: longitude },
           heading: heading || 0,
-          speed: speed ? (speed * 3.6).toFixed(1) : 0, 
-          type: 'bus', 
+          speed: (adjustedSpeed * 3.6).toFixed(1), // Use Adjusted Speed
+          type: isAirway ? 'airway' : 'bus', 
           isRealDriver: true,
           startStop: startStopData?.name,
           endStop: endStopData?.name,

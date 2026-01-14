@@ -45,18 +45,8 @@ export default function LandingPage() {
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="relative"
         >
-          <div className="flex justify-center mb-6">
-             <motion.div 
-               initial={{ scale: 0 }}
-               animate={{ scale: 1 }}
-               transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-               className="p-3 bg-white/10 rounded-2xl backdrop-blur-md border border-white/10"
-             >
-                <FaSatelliteDish className="text-4xl text-blue-400" />
-             </motion.div>
-          </div>
+
           
-          {/* --- THE NAME CHANGE --- */}
           <h1 className="text-6xl md:text-8xl tracking-tight mb-6 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6">
             {/* Part 1: Vahan (Samarkan Font) */}
             <span 

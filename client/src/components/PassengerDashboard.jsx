@@ -20,9 +20,13 @@ import RouteSelector from './RouteSelector';
 import RouteOptimizer from './RouteOptimizer';
 import SeatTracker from './SeatTracker';
 
-const SERVER_SOCKET_URL = 'http://localhost:5000';
-const SIMULATOR_URL = 'http://localhost:5001';
-const API_URL = 'http://localhost:5000';
+// --- UPDATED SECTION: Import Config ---
+import { API_URL, SOCKET_URL } from '../config';
+
+// We map the simulator to the main socket URL for production compatibility
+const SERVER_SOCKET_URL = SOCKET_URL;
+const SIMULATOR_URL = SOCKET_URL; 
+// --------------------------------------
 
 function PassengerDashboard() {
   const [routes, setRoutes] = useState([]);
@@ -62,6 +66,8 @@ function PassengerDashboard() {
       reconnectionAttempts: 5
     });
 
+    // In production, this attempts to connect to the main server 
+    // to prevent "connection refused" errors on port 5001
     const simSocket = io(SIMULATOR_URL, {
       transports: ['websocket'],
       reconnection: true
