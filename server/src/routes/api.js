@@ -60,6 +60,37 @@ router.get('/stops', (req, res) => {
   }
 });
 
+// Get active buses (from database or memory)
+import Bus from '../models/Bus.js';
+
+router.get('/active-buses', async (req, res) => {
+  try {
+    // Query database for active buses
+    const activeBuses = await Bus.find({ status: 'active' });
+    
+    res.json({
+      success: true,
+      data: activeBuses.map(bus => ({
+        busId: bus.busId,
+        routeId: bus.routeId ? bus.routeId.toString() : null,
+        position: bus.lastPosition,
+        heading: bus.heading || 0,
+        speed: bus.speed || 0,
+        passengers: bus.passengers || 0,
+        type: bus.type || 'bus',
+        status: bus.status,
+        lastUpdate: bus.lastUpdate
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching active buses',
+      error: error.message
+    });
+  }
+});
+
 // --- Seat availability endpoints (simple in-memory for demo)
 import { getAllSeats, getSeatsForRoute, getSeatsForBus, bookSeat } from '../seatManager.js';
 

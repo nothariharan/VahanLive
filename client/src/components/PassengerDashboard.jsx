@@ -73,6 +73,27 @@ function PassengerDashboard() {
     }
   }, [isMobile]);
 
+  // Fetch active buses from database for cached display (independent of simulator)
+  useEffect(() => {
+    const fetchActiveBuses = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/active-buses`);
+        if (response.data.data && response.data.data.length > 0) {
+          setBuses(response.data.data);
+          console.log(`📍 Loaded ${response.data.data.length} active buses from database`);
+        }
+      } catch (error) {
+        console.warn('Could not fetch active buses from database:', error.message);
+        // This is not critical - we'll get live updates via socket
+      }
+    };
+
+    // Fetch immediately and then every 30 seconds as fallback
+    fetchActiveBuses();
+    const interval = setInterval(fetchActiveBuses, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Setup Socket.io connections - defer on mobile until map renders
   useEffect(() => {
     // On mobile, only connect after map is ready

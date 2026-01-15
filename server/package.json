@@ -4,7 +4,7 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "concurrently \"node src/server.js\" \"node simulator.js\"",
     "dev": "nodemon src/server.js",
     "simulate": "node src/simulator.js"
   },
