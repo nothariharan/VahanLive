@@ -18,7 +18,6 @@ const SeatTracker = ({ watchedRoutes = [], onRemoveWatch }) => {
   const [openBus, setOpenBus] = useState({}); // keyed by busId
 
   useEffect(() => {
-    // On mobile, defer socket connection until watched routes are needed
     if (isMobile && watchedRoutes.length === 0) return;
 
     const s = io(SOCKET_URL, { transports: ['websocket'] });

@@ -94,7 +94,6 @@ const BusMarker = ({ bus, routeColor, seatInfo, routeStops = [] }) => {
 
       setIsAnimating(true);
 
-      // --- DURATION CALCULATION (Restored from your original code) ---
       const calculateDuration = () => {
         const start = startPositionRef.current;
         const target = targetPositionRef.current;
@@ -103,9 +102,7 @@ const BusMarker = ({ bus, routeColor, seatInfo, routeStops = [] }) => {
         
         const rawDurationMs = (distance / speed_m_s) * 1000; 
 
-        // Important: I lowered TIME_SCALE to 1. 
-        // If you want it FASTER, increase this number (e.g. 10 or 60).
-        // If you want it SLOWER (Real-time), keep it at 1.
+        //lowered TIME_SCALE to 1. 
         const TIME_SCALE = 1; 
 
         // Clamp duration: Minimum 1 second, Maximum 10 seconds (to prevent super slow movement)

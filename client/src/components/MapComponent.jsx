@@ -22,7 +22,6 @@ function MobileOptimizations() {
   return null;
 }
 
-// Fix for default marker icons in react-leaflet
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -94,7 +93,6 @@ const MapComponent = ({ selectedRoute, buses, seatsMap = {}, routeSeatsMap = {} 
   const defaultZoom = 5;
   const indiaBounds = [[6.0, 68.0], [36.0, 98.0]]; // southWest, northEast
 
-  // FIX 2: Handle zoom changes for bus visibility on mobile
   const handleZoomChange = (newZoom) => {
     setZoom(newZoom);
     if (isMobile && newZoom >= 10) {
@@ -121,7 +119,6 @@ const MapComponent = ({ selectedRoute, buses, seatsMap = {}, routeSeatsMap = {} 
     >
       <MobileOptimizations />
       
-      {/* FIX 1: Lighter tile layer on mobile using CartoDB Positron */}
       <TileLayer
         attribution={isMobile ? '&copy; <a href="https://carto.com/">CARTO</a>' : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
         url={isMobile 
@@ -134,7 +131,6 @@ const MapComponent = ({ selectedRoute, buses, seatsMap = {}, routeSeatsMap = {} 
         <>
           <MapViewController route={selectedRoute} buses={visibleBuses || buses} isMobile={isMobile} />
           
-          {/* FIX 4: Thinner polylines on mobile */}
           <Polyline
             positions={selectedRoute.path}
             pathOptions={{
@@ -145,7 +141,6 @@ const MapComponent = ({ selectedRoute, buses, seatsMap = {}, routeSeatsMap = {} 
             }}
           />
 
-          {/* FIX 3: Hide bus stops at low zoom on mobile */}
           {(!isMobile || zoom >= 10) && selectedRoute.stops.map((stop) => (
             <Marker
               key={stop.id}
@@ -187,7 +182,6 @@ const MapComponent = ({ selectedRoute, buses, seatsMap = {}, routeSeatsMap = {} 
         </>
       )}
 
-      {/* FIX 2: Lazy render bus markers on mobile (only active ones or those in viewport) */}
       {(visibleBuses && visibleBuses.length > 0 ? visibleBuses : buses).map((bus) => (
         <BusMarker
           key={bus.busId}

@@ -96,21 +96,19 @@ export default function DriverDashboard() {
     return true;
   };
 
-  // --- FIXED START LOGIC ---
   const startDriving = (e) => {
     e.preventDefault();
     if (!validateForm()) return;
     if (!('geolocation' in navigator)) { setError('Geolocation is not supported'); return; }
 
-    setStatus('📡 Acquiring GPS Lock...');
+    setStatus(' Acquiring GPS Lock...');
     
     // 1. Get Initial GPS Lock FIRST (Before changing UI)
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const { latitude, longitude, heading, speed } = position.coords;
-            console.log("📍 GPS Locked:", latitude, longitude);
+            console.log(" GPS Locked:", latitude, longitude);
 
-            // Determine if airway or bus to apply initial speed dampening
             const selectedRouteData = routes.find(r => r.id === selectedRoute);
             const isAirway = selectedRouteData?.type === 'airway';
             // 0.6x for planes (little slower), 0.2x for buses (much slower)
@@ -125,7 +123,7 @@ export default function DriverDashboard() {
                 type: isAirway ? 'airway' : 'bus',
                 position: { lat: latitude, lng: longitude },
                 heading: heading || 0,
-                speed: (adjustedSpeed * 3.6).toFixed(1) // Convert adjusted speed to km/h
+                speed: (adjustedSpeed * 3.6).toFixed(1) 
             };
 
             // 3. Send "Login" to Server (Crucial for DB Persistence)
@@ -171,19 +169,17 @@ export default function DriverDashboard() {
       (position) => {
         const { latitude, longitude, heading, speed } = position.coords;
         
-        // --- SPEED CONTROL LOGIC ---
         const isAirway = route?.type === 'airway';
-        // Factor 0.6 for planes (little slower), Factor 0.2 for buses (MUCH slower)
         const speedMultiplier = isAirway ? 0.6 : 0.2; 
         const adjustedSpeed = (speed || 0) * speedMultiplier;
-        // ---------------------------
+
 
         const locationData = {
           busId: busId,
           routeId: activeRouteId,
           position: { lat: latitude, lng: longitude },
           heading: heading || 0,
-          speed: (adjustedSpeed * 3.6).toFixed(1), // Use Adjusted Speed
+          speed: (adjustedSpeed * 3.6).toFixed(1),
           type: isAirway ? 'airway' : 'bus', 
           isRealDriver: true,
           startStop: startStopData?.name,

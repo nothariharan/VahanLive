@@ -21,7 +21,6 @@ import RouteSelector from './RouteSelector';
 import RouteOptimizer from './RouteOptimizer';
 import SeatTracker from './SeatTracker';
 
-// --- UPDATED SECTION: Import Config ---
 import { API_URL, SOCKET_URL } from '../config';
 
 // Mobile detection
@@ -29,10 +28,8 @@ const isMobileDevice = () => {
   return typeof window !== 'undefined' && window.innerWidth < 768;
 };
 
-// We map the simulator to the main socket URL for production compatibility
 const SERVER_SOCKET_URL = SOCKET_URL;
 const SIMULATOR_URL = SOCKET_URL; 
-// --------------------------------------
 
 function PassengerDashboard() {
   const [routes, setRoutes] = useState([]);
@@ -48,7 +45,6 @@ function PassengerDashboard() {
   const [isMobile] = useState(isMobileDevice());
   const [mapReady, setMapReady] = useState(false);
 
-  // Fetch routes from API - prioritize map rendering on mobile
   useEffect(() => {
     const fetchRoutes = async () => {
       try {
@@ -64,7 +60,6 @@ function PassengerDashboard() {
       }
     };
 
-    // On mobile, defer fetching slightly to let map render first
     if (isMobile) {
       const timer = setTimeout(fetchRoutes, 500);
       return () => clearTimeout(timer);

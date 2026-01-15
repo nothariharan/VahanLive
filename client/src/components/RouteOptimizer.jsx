@@ -62,7 +62,7 @@ const RouteOptimizer = () => {
     }
 
     setLoading(true);
-    setResult(null); // Clear previous results immediately
+    setResult(null); 
     
     try {
       const response = await axios.post(`${API_URL}/api/optimize-route`, {

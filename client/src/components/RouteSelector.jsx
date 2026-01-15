@@ -116,7 +116,7 @@ const RouteSelector = ({ routes, selectedRoute, onRouteSelect, watchedRoutes = [
                 </div>
               </div>
 
-              {/* Color Strip Indicator (Only visible when not selected) */}
+              {/* Color Strip Indicator  */}
               {!isSelected && (
                 <div 
                   className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full"

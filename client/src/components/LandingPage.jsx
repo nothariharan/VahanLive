@@ -3,13 +3,10 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaMapMarkedAlt } from 'react-icons/fa';
 import { MdGpsFixed } from "react-icons/md";
-// Ensure this path is correct based on your folder structure
 import customBusIcon from '../assets/image_3.png'
 
 export default function LandingPage() {
   return (
-    // FIX 1: Changed 'justify-center' to 'justify-start md:justify-center'
-    // This prevents content from being cut off on small screens if it's too tall.
     <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-start md:justify-center relative overflow-x-hidden text-white py-4 md:py-0">
       
       {/* --- Animated Background Elements --- */}
@@ -38,7 +35,6 @@ export default function LandingPage() {
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 md:opacity-20 brightness-100 mix-blend-overlay pointer-events-none"></div>
 
       {/* --- Main Content --- */}
-      {/* FIX 2: Added 'mt-4 md:mt-0' to push content down slightly on mobile since we removed vertical centering */}
       <div className="z-10 text-center space-y-12 md:space-y-16 px-4 w-full max-w-7xl mt-4 md:mt-0">
         
         {/* Title Section */}
@@ -77,7 +73,6 @@ export default function LandingPage() {
         <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center justify-center pb-8">
           
           {/* 1. Passenger Card */}
-          {/* FIX 3: Added 'w-full md:w-auto flex justify-center' to Link so it holds the button correctly */}
           <Link to="/map" className="w-full md:w-auto flex justify-center">
             <motion.button
               initial={{ opacity: 0, x: -50 }}
@@ -85,7 +80,6 @@ export default function LandingPage() {
               transition={{ delay: 0.3 }}
               whileHover={{ scale: 1.05, translateY: -5 }}
               whileTap={{ scale: 0.95 }}
-              // FIX 4: Added 'max-w-sm' to keep mobile buttons looking neat
               className="group relative w-full max-w-sm md:w-72 h-64 md:h-80 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden hover:border-blue-500/50 transition-colors duration-500"
             >
               {/* Hover Glow Effect */}
