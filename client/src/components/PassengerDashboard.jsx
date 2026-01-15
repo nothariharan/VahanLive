@@ -66,8 +66,7 @@ function PassengerDashboard() {
       reconnectionAttempts: 5
     });
 
-    // In production, this attempts to connect to the main server 
-    // to prevent "connection refused" errors on port 5001
+
     const simSocket = io(SIMULATOR_URL, {
       transports: ['websocket'],
       reconnection: true

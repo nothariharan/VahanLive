@@ -10,7 +10,7 @@ export default function LandingPage() {
   return (
     // FIX 1: Changed 'justify-center' to 'justify-start md:justify-center'
     // This prevents content from being cut off on small screens if it's too tall.
-    <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-start md:justify-center relative overflow-x-hidden text-white py-20 md:py-0">
+    <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-start md:justify-center relative overflow-x-hidden text-white py-4 md:py-0">
       
       {/* --- Animated Background Elements --- */}
       {/* Blue Blob */}
