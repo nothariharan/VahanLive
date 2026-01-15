@@ -24,6 +24,11 @@ import SeatTracker from './SeatTracker';
 // --- UPDATED SECTION: Import Config ---
 import { API_URL, SOCKET_URL } from '../config';
 
+// Mobile detection
+const isMobileDevice = () => {
+  return typeof window !== 'undefined' && window.innerWidth < 768;
+};
+
 // We map the simulator to the main socket URL for production compatibility
 const SERVER_SOCKET_URL = SOCKET_URL;
 const SIMULATOR_URL = SOCKET_URL; 
@@ -40,8 +45,10 @@ function PassengerDashboard() {
   const [connectionStatus, setConnectionStatus] = useState('Disconnected');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [watchedRoutes, setWatchedRoutes] = useState([]);
+  const [isMobile] = useState(isMobileDevice());
+  const [mapReady, setMapReady] = useState(false);
 
-  // Fetch routes from API
+  // Fetch routes from API - prioritize map rendering on mobile
   useEffect(() => {
     const fetchRoutes = async () => {
       try {
@@ -50,23 +57,33 @@ function PassengerDashboard() {
         if (response.data.data.length > 0) {
           setSelectedRoute(response.data.data[0]);
         }
+        setMapReady(true);
       } catch (error) {
         console.error('Error fetching routes:', error);
+        setMapReady(true);
       }
     };
 
-    fetchRoutes();
-  }, []);
+    // On mobile, defer fetching slightly to let map render first
+    if (isMobile) {
+      const timer = setTimeout(fetchRoutes, 500);
+      return () => clearTimeout(timer);
+    } else {
+      fetchRoutes();
+    }
+  }, [isMobile]);
 
-  // Setup Socket.io connections
+  // Setup Socket.io connections - defer on mobile until map renders
   useEffect(() => {
+    // On mobile, only connect after map is ready
+    if (isMobile && !mapReady) return;
+
     const serverSocket = io(SERVER_SOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5
     });
-
 
     const simSocket = io(SIMULATOR_URL, {
       transports: ['websocket'],
@@ -142,10 +159,13 @@ function PassengerDashboard() {
       serverSocket.close();
       simSocket.close();
     };
-  }, []);
+  }, [isMobile, mapReady, selectedRoute]);
 
-  // Setup seat updates
+  // Setup seat updates - defer on mobile
   useEffect(() => {
+    // On mobile, only connect after map is ready
+    if (isMobile && !mapReady) return;
+
     const seatSocket = io(SERVER_SOCKET_URL, { transports: ['websocket'] });
     setBankSocket(seatSocket);
 
@@ -168,7 +188,7 @@ function PassengerDashboard() {
     })();
 
     return () => seatSocket.close();
-  }, []);
+  }, [isMobile, mapReady]);
 
   // Subscribe to route updates
   useEffect(() => {
@@ -226,18 +246,18 @@ function PassengerDashboard() {
       
       {/* Toggle Button */}
       <motion.button
-        whileHover={{ scale: 1.1, backgroundColor: "#ecfdf5" }} // Greenish tint
-        whileTap={{ scale: 0.9 }}
+        whileHover={!isMobile ? { scale: 1.1, backgroundColor: "#ecfdf5" } : {}}
+        whileTap={!isMobile ? { scale: 0.9 } : {}}
         onClick={() => setSidebarOpen(!sidebarOpen)}
         className="fixed top-4 z-[2000] p-3 rounded-full shadow-xl 
                    bg-white/90 backdrop-blur-md border border-gray-200 
                    text-gray-700 hover:text-emerald-600 hover:shadow-2xl hover:border-emerald-200"
         animate={{ left: sidebarOpen ? '336px' : '16px' }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        transition={isMobile ? { duration: 0.2 } : { type: "spring", stiffness: 400, damping: 25 }}
       >
         <motion.div
           animate={{ rotate: sidebarOpen ? 0 : 180 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: isMobile ? 0.2 : 0.4 }}
         >
           {sidebarOpen ? <FaChevronLeft /> : <FaChevronRight />}
         </motion.div>
@@ -250,21 +270,21 @@ function PassengerDashboard() {
             initial={{ x: -320 }}
             animate={{ x: 0 }}
             exit={{ x: -320 }}
-            transition={{ duration: 0.3, type: 'spring', damping: 25 }}
+            transition={isMobile ? { duration: 0.2 } : { duration: 0.3, type: 'spring', damping: 25 }}
             className="w-80 bg-white/95 backdrop-blur-xl shadow-2xl overflow-y-auto z-[1500] border-r border-white/20"
           >
             <div className="p-4 pt-16">
               {/* Header */}
               <motion.div
-                initial={{ opacity: 0, y: -20 }}
+                initial={!isMobile ? { opacity: 0, y: -20 } : {}}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
+                transition={isMobile ? { duration: 0 } : { delay: 0.2 }}
                 className="mb-6"
               >
                 <Link to="/" className="no-underline">
                   <motion.div 
                     className="flex items-end gap-2 mb-3 cursor-pointer"
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={!isMobile ? { scale: 1.02 } : {}}
                   >
                       <span 
                           className="text-4xl bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500"
@@ -381,14 +401,23 @@ function PassengerDashboard() {
                 )}
               </AnimatePresence>
 
-              {/* Route Optimizer */}
-              <RouteOptimizer />
+              {/* Route Optimizer - lazy load on mobile */}
+              {!isMobile && <RouteOptimizer />}
+              {isMobile && sidebarOpen && <RouteOptimizer />}
 
-              {/* Seat Tracker */}
-              <SeatTracker
-                watchedRoutes={watchedRoutes}
-                onRemoveWatch={(r) => setWatchedRoutes((prev) => prev.filter(x => x.id !== r.id))}
-              />
+              {/* Seat Tracker - lazy load on mobile */}
+              {!isMobile && (
+                <SeatTracker
+                  watchedRoutes={watchedRoutes}
+                  onRemoveWatch={(r) => setWatchedRoutes((prev) => prev.filter(x => x.id !== r.id))}
+                />
+              )}
+              {isMobile && sidebarOpen && (
+                <SeatTracker
+                  watchedRoutes={watchedRoutes}
+                  onRemoveWatch={(r) => setWatchedRoutes((prev) => prev.filter(x => x.id !== r.id))}
+                />
+              )}
             </div>
           </motion.div>
         )}
@@ -405,9 +434,9 @@ function PassengerDashboard() {
 
         {/* Floating Stats */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={!isMobile ? { opacity: 0, y: 20 } : {}}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
+          transition={isMobile ? { duration: 0 } : { delay: 0.5 }}
           className="absolute top-4 right-4 bg-white/90 backdrop-blur-md rounded-xl shadow-lg border border-white/40 p-4 z-[1000] min-w-[160px]"
         >
           <div className="text-xs text-gray-600 space-y-3">
@@ -439,9 +468,9 @@ function PassengerDashboard() {
 
         {/* Legend */}
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
+          initial={!isMobile ? { opacity: 0, x: 20 } : {}}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.7 }}
+          transition={isMobile ? { duration: 0 } : { delay: 0.7 }}
           className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-md rounded-xl shadow-lg border border-white/40 p-4 z-[1000]"
         >
           <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Map Legend</h4>
