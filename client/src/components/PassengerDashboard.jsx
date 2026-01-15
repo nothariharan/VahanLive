@@ -1,5 +1,6 @@
 // client/src/components/PassengerDashboard.jsx
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { io } from 'socket.io-client';
 import axios from 'axios';
@@ -260,24 +261,25 @@ function PassengerDashboard() {
                 transition={{ delay: 0.2 }}
                 className="mb-6"
               >
-                {/* UPDATED TITLE STYLING */}
-                <motion.div 
-                  className="flex items-end gap-2 mb-3 cursor-pointer"
-                  whileHover={{ scale: 1.02 }}
-                >
-                    <span 
-                        className="text-4xl bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500"
-                        style={{ fontFamily: "'Samarkan', sans-serif" }}
-                    >
-                      Vahan
-                    </span>
-                    <span 
-                        className="text-2xl font-light italic text-slate-700 pb-1"
-                        style={{ fontFamily: "'Playfair Display', serif" }}
-                    >
-                      Live
-                    </span>
-                </motion.div>
+                <Link to="/" className="no-underline">
+                  <motion.div 
+                    className="flex items-end gap-2 mb-3 cursor-pointer"
+                    whileHover={{ scale: 1.02 }}
+                  >
+                      <span 
+                          className="text-4xl bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500"
+                          style={{ fontFamily: "'Samarkan', sans-serif" }}
+                      >
+                        Vahan
+                      </span>
+                      <span 
+                          className="text-2xl font-light italic text-slate-700 pb-1"
+                          style={{ fontFamily: "'Playfair Display', serif" }}
+                      >
+                        Live
+                      </span>
+                  </motion.div>
+                </Link>
 
                 {/* Connection Status */}
                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-lg p-2.5 shadow-inner">

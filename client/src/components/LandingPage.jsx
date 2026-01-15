@@ -21,7 +21,7 @@ export default function LandingPage() {
           y: [0, 30, 0]
         }}
         transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px]" 
+        className="hidden md:block absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[60px] md:blur-[120px]" 
       />
       {/* Purple Blob */}
       <motion.div 
@@ -31,11 +31,11 @@ export default function LandingPage() {
           y: [0, 50, 0]
         }}
         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-        className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[120px]" 
+        className="hidden md:block absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[60px] md:blur-[120px]" 
       />
       
       {/* Grid Pattern Overlay */}
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 mix-blend-overlay pointer-events-none"></div>
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 md:opacity-20 brightness-100 mix-blend-overlay pointer-events-none"></div>
 
       {/* --- Main Content --- */}
       {/* FIX 2: Added 'mt-4 md:mt-0' to push content down slightly on mobile since we removed vertical centering */}
