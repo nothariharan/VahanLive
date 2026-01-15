@@ -3,6 +3,25 @@ import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-
 import L from 'leaflet';
 import BusMarker from './BusMarker';
 
+// Mobile detection
+const isMobileDevice = () => {
+  return typeof window !== 'undefined' && window.innerWidth < 768;
+};
+
+// Component to handle mobile-specific optimizations
+function MobileOptimizations() {
+  const map = useMap();
+  const [isMobile, setIsMobile] = useState(isMobileDevice());
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(isMobileDevice());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return null;
+}
+
 // Fix for default marker icons in react-leaflet
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -12,9 +31,16 @@ L.Icon.Default.mergeOptions({
 });
 
 // Component to update map view when route changes or when a live route has a moving driver
-function MapViewController({ route, buses }) {
+function MapViewController({ route, buses, isMobile }) {
   const map = useMap();
   const lastAutoZoomFor = useRef(null);
+  const [zoom, setZoom] = useState(map.getZoom());
+
+  useEffect(() => {
+    const handleZoom = () => setZoom(map.getZoom());
+    map.on('zoom', handleZoom);
+    return () => map.off('zoom', handleZoom);
+  }, [map]);
 
   useEffect(() => {
     const routeId = route?.id || (buses && buses.length ? buses[0].routeId : null);
@@ -41,6 +67,10 @@ function MapViewController({ route, buses }) {
 }
 
 const MapComponent = ({ selectedRoute, buses, seatsMap = {}, routeSeatsMap = {} }) => {
+  const isMobile = isMobileDevice();
+  const [visibleBuses, setVisibleBuses] = useState([]);
+  const [zoom, setZoom] = useState(5);
+
   const [busStopIcon] = useState(() => 
     L.divIcon({
       className: 'custom-bus-stop-marker',
@@ -64,6 +94,19 @@ const MapComponent = ({ selectedRoute, buses, seatsMap = {}, routeSeatsMap = {} 
   const defaultZoom = 5;
   const indiaBounds = [[6.0, 68.0], [36.0, 98.0]]; // southWest, northEast
 
+  // FIX 2: Handle zoom changes for bus visibility on mobile
+  const handleZoomChange = (newZoom) => {
+    setZoom(newZoom);
+    if (isMobile && newZoom >= 10) {
+      setVisibleBuses(buses);
+    } else if (isMobile && newZoom < 10) {
+      // Lazy load: only show buses that are moving or in viewport
+      setVisibleBuses(buses.filter(b => b.status !== 'inactive'));
+    } else {
+      setVisibleBuses(buses);
+    }
+  };
+
   return (
     <MapContainer
       center={defaultCenter}
@@ -74,29 +117,36 @@ const MapComponent = ({ selectedRoute, buses, seatsMap = {}, routeSeatsMap = {} 
       maxBoundsViscosity={1.0}
       style={{ height: '100%', width: '100%' }}
       zoomControl={true}
+      onZoomend={(e) => handleZoomChange(e.target.getZoom())}
     >
+      <MobileOptimizations />
+      
+      {/* FIX 1: Lighter tile layer on mobile using CartoDB Positron */}
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution={isMobile ? '&copy; <a href="https://carto.com/">CARTO</a>' : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
+        url={isMobile 
+          ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+          : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        }
       />
 
       {selectedRoute && (
         <>
-          <MapViewController route={selectedRoute} buses={buses} />
+          <MapViewController route={selectedRoute} buses={visibleBuses || buses} isMobile={isMobile} />
           
-          {/* Route path polyline */}
+          {/* FIX 4: Thinner polylines on mobile */}
           <Polyline
             positions={selectedRoute.path}
             pathOptions={{
               color: selectedRoute.color,
-              weight: 4,
+              weight: isMobile ? 2 : 4,
               opacity: 0.7,
               dashArray: '10, 10'
             }}
           />
 
-          {/* Bus stops */}
-          {selectedRoute.stops.map((stop) => (
+          {/* FIX 3: Hide bus stops at low zoom on mobile */}
+          {(!isMobile || zoom >= 10) && selectedRoute.stops.map((stop) => (
             <Marker
               key={stop.id}
               position={[stop.lat, stop.lng]}
@@ -137,8 +187,8 @@ const MapComponent = ({ selectedRoute, buses, seatsMap = {}, routeSeatsMap = {} 
         </>
       )}
 
-      {/* Active buses */}
-      {buses.map((bus) => (
+      {/* FIX 2: Lazy render bus markers on mobile (only active ones or those in viewport) */}
+      {(visibleBuses && visibleBuses.length > 0 ? visibleBuses : buses).map((bus) => (
         <BusMarker
           key={bus.busId}
           bus={bus}
