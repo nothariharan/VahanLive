@@ -2,16 +2,25 @@ import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 import { FaMagnifyingGlass } from 'react-icons/fa6';
-import { MdEventSeat, MdFlightClass, MdDirectionsBus, MdClose } from 'react-icons/md'; // Added generic icons for better UI
+import { MdEventSeat, MdFlightClass, MdDirectionsBus, MdClose } from 'react-icons/md';
 
 import { API_URL,SOCKET_URL } from '../config';
 
+// Mobile detection
+const isMobileDevice = () => {
+  return typeof window !== 'undefined' && window.innerWidth < 768;
+};
+
 const SeatTracker = ({ watchedRoutes = [], onRemoveWatch }) => {
+  const [isMobile] = useState(isMobileDevice());
   const [socket, setSocket] = useState(null);
   const [seatsMap, setSeatsMap] = useState({}); // keyed by busId
   const [openBus, setOpenBus] = useState({}); // keyed by busId
 
   useEffect(() => {
+    // On mobile, defer socket connection until watched routes are needed
+    if (isMobile && watchedRoutes.length === 0) return;
+
     const s = io(SOCKET_URL, { transports: ['websocket'] });
     setSocket(s);
 
@@ -35,7 +44,7 @@ const SeatTracker = ({ watchedRoutes = [], onRemoveWatch }) => {
     return () => {
       s.close();
     };
-  }, []);
+  }, [isMobile, watchedRoutes.length]);
 
   // compute watched seats grouped by route
   const grouped = {};
@@ -163,7 +172,7 @@ const SeatTracker = ({ watchedRoutes = [], onRemoveWatch }) => {
 
                       {/* Expanded Details */}
                       {openBus[bus.busId] && (
-                        <div className="px-3 pb-3 pt-0 bg-blue-50/30 animate-in slide-in-from-top-1 duration-200">
+                        <div className={`px-3 pb-3 pt-0 bg-blue-50/30 ${isMobile ? '' : 'animate-in slide-in-from-top-1 duration-200'}`}>
                           <div className="p-3 bg-white rounded-lg border border-gray-100 shadow-sm">
                             {bus.type === 'bus' ? (
                               <CapacityBar 

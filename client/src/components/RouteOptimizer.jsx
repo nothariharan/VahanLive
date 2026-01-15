@@ -14,8 +14,15 @@ import {
 import { MdTimer, MdAirlineSeatReclineNormal } from 'react-icons/md';
 import { GoAlertFill } from 'react-icons/go';
 
-import { API_URL } from '../config'; 
+import { API_URL } from '../config';
+
+// Mobile detection
+const isMobileDevice = () => {
+  return typeof window !== 'undefined' && window.innerWidth < 768;
+};
+
 const RouteOptimizer = () => {
+  const [isMobile] = useState(isMobileDevice());
   const [stops, setStops] = useState([]);
   const [startStop, setStartStop] = useState('');
   const [endStop, setEndStop] = useState('');
@@ -23,7 +30,7 @@ const RouteOptimizer = () => {
   const [seatSummaries, setSeatSummaries] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // Fetch all stops on component mount
+  // Fetch all stops - defer on mobile to improve initial load
   useEffect(() => {
     const fetchStops = async () => {
       try {
@@ -33,8 +40,15 @@ const RouteOptimizer = () => {
         console.error('Error fetching stops:', error);
       }
     };
-    fetchStops();
-  }, []);
+    
+    // On mobile, defer stops fetching by 2 seconds
+    if (isMobile) {
+      const timer = setTimeout(fetchStops, 2000);
+      return () => clearTimeout(timer);
+    } else {
+      fetchStops();
+    }
+  }, [isMobile]);
 
   const handleOptimize = async () => {
     if (!startStop || !endStop) {
@@ -141,8 +155,8 @@ const RouteOptimizer = () => {
           {/* Swap Button (Floating) */}
           <div className="absolute right-4 top-[50%] -translate-y-[50%] z-20">
              <motion.button
-              whileHover={{ scale: 1.1, rotate: 180 }}
-              whileTap={{ scale: 0.9 }}
+              whileHover={!isMobile ? { scale: 1.1, rotate: 180 } : {}}
+              whileTap={!isMobile ? { scale: 0.9 } : {}}
               onClick={handleSwap}
               className="p-2 bg-white rounded-full shadow-md border border-gray-100 text-emerald-600 hover:text-emerald-700 transition-colors"
             >
@@ -170,8 +184,8 @@ const RouteOptimizer = () => {
 
         {/* Find Route Button */}
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          whileHover={!isMobile ? { scale: 1.02 } : {}}
+          whileTap={!isMobile ? { scale: 0.98 } : {}}
           onClick={handleOptimize}
           disabled={loading}
           className={`w-full py-3 px-4 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${

@@ -368,7 +368,7 @@ function PassengerDashboard() {
                           key={bus.busId}
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: idx * 0.05 }}
+                          transition={{ delay: isMobile ? 0 : idx * 0.05 }}
                           className="bg-white/10 rounded-lg p-2 text-xs text-white backdrop-blur-md border border-white/10"
                         >
                           <div className="flex justify-between items-center gap-2">

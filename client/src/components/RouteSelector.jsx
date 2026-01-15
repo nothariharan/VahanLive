@@ -11,7 +11,13 @@ import {
 } from 'react-icons/fa';
 import { MdAirlineSeatReclineNormal } from 'react-icons/md';
 
+// Mobile detection
+const isMobileDevice = () => {
+  return typeof window !== 'undefined' && window.innerWidth < 768;
+};
+
 const RouteSelector = ({ routes, selectedRoute, onRouteSelect, watchedRoutes = [], toggleWatch, routeSeatsMap = {} }) => {
+  const isMobile = isMobileDevice();
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -37,11 +43,11 @@ const RouteSelector = ({ routes, selectedRoute, onRouteSelect, watchedRoutes = [
               key={route.id}
               role="button"
               tabIndex={0}
-              initial={{ opacity: 0, x: -20 }}
+              initial={!isMobile ? { opacity: 0, x: -20 } : {}}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05 }}
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
+              transition={isMobile ? { duration: 0 } : { delay: index * 0.05 }}
+              whileHover={!isMobile ? { scale: 1.01 } : {}}
+              whileTap={!isMobile ? { scale: 0.98 } : {}}
               onClick={() => onRouteSelect(route)}
               className={`relative w-full text-left p-3 rounded-xl transition-all cursor-pointer border ${
                 isSelected
